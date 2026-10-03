@@ -1,0 +1,121 @@
+import os
+import json
+from io import BytesIO
+from PIL import Image, ImageFilter, ImageDraw, ImageFont
+import requests
+from google import genai
+from google.genai import types
+from pydantic import BaseModel
+
+# Initialize Client
+client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
+
+class LogoDetectionResult(BaseModel):
+    boxes: list[list[int]]  # Format: [[ymin, xmin, ymax, xmax], ...]
+
+def detect_logos(image: Image.Image) -> list[list[int]]:
+    """Requests normalized bounding boxes for logos/brand names."""
+    buffered = BytesIO()
+    image.save(buffered, format="JPEG")
+    img_bytes = buffered.getvalue()
+
+    prompt = (
+        "Return bounding boxes for all brand logos, trademarks, and prominent "
+        "manufacturer brand text on the packaging as normalized 0-1000 integers [ymin, xmin, ymax, xmax]."
+    )
+
+    response = client.models.generate_content(
+        model="gemini-1.5-flash",
+        contents=[
+            types.Part.from_bytes(data=img_bytes, mime_type="image/jpeg"),
+            prompt
+        ],
+        config=types.GenerateContentConfig(
+            response_mime_type="application/json",
+            response_schema=LogoDetectionResult,
+            temperature=0.1
+        )
+    )
+
+    result = json.loads(response.text)
+    return result.get("boxes", [])
+
+def sanitize_copy(raw_title: str, raw_desc: str) -> str:
+    """Generates generic social copy stripping out brands and medical claims."""
+    prompt = f"""
+    Title: {raw_title}
+    Description: {raw_desc}
+
+    Rewrite into a 2-sentence social deal post complying with these strict rules:
+    1. NEVER mention the brand name, parent company, or trademarked characters.
+    2. Replace all medical/disinfecting words ('disinfect', 'antibacterial', 'sanitizer') with generic terms ('surface wipes', 'cleaning solution', 'refresher').
+    3. Do not include raw dollar amounts.
+    """
+    response = client.models.generate_content(
+        model="gemini-1.5-flash",
+        contents=prompt
+    )
+    return response.text.strip()
+
+def mask_image(image: Image.Image, boxes: list[list[int]], mode: str = "badge") -> Image.Image:
+    """Masks detected boxes with a decorative ribbon or heavy blur."""
+    img = image.copy()
+    w, h = img.size
+
+    for box in boxes:
+        ymin, xmin, ymax, xmax = box
+        left = int((xmin / 1000) * w)
+        top = int((ymin / 1000) * h)
+        right = int((xmax / 1000) * w)
+        bottom = int((ymax / 1000) * h)
+
+        # Safety padding
+        pad = 6
+        box_tuple = (max(0, left - pad), max(0, top - pad), min(w, right + pad), min(h, bottom + pad))
+
+        if mode == "blur":
+            crop_region = img.crop(box_tuple)
+            blurred = crop_region.filter(ImageFilter.GaussianBlur(radius=20))
+            img.paste(blurred, box_tuple)
+
+        elif mode == "badge":
+            draw = ImageDraw.Draw(img)
+            # Draw red banner background
+            draw.rectangle(box_tuple, fill="#dc2626")
+            # Stamp clean generic text badge
+            badge_text = "SPECIAL DEAL"
+            draw.text((box_tuple[0] + 5, box_tuple[1] + 5), badge_text, fill="#ffffff")
+
+    return img
+
+def process_deal(image_path_or_url: str, title: str, desc: str, output_img_path: str):
+    # Load image
+    if image_path_or_url.startswith("http"):
+        resp = requests.get(image_path_or_url)
+        img = Image.open(BytesIO(resp.content)).convert("RGB")
+    else:
+        img = Image.open(image_path_or_url).convert("RGB")
+
+    print(f"Detecting logos for: {title[:30]}...")
+    boxes = detect_logos(img)
+    print(f"Found {len(boxes)} regions to mask.")
+
+    # Mask graphic
+    final_img = mask_image(img, boxes, mode="badge")
+    final_img.save(output_img_path, "JPEG", quality=90)
+
+    # Sanitize copy
+    clean_copy = sanitize_copy(title, desc)
+
+    print("\n--- RESULTS ---")
+    print(f"Saved Image: {output_img_path}")
+    print(f"Compliant Copy:\n{clean_copy}\n")
+
+if __name__ == "__main__":
+    # Example execution
+    process_deal(
+        image_path_or_url="https://images.unsplash.com/photo-1583947215259-38e31be8751f", # Sample sanitizer bottle
+        title="Purell Advanced Hand Sanitizer Refreshing Gel 2-Pack",
+        desc="Kills 99.99% of germs. Medical-grade antibacterial formula for $8.99.",
+        output_img_path="sanitized_deal.jpg"
+    )
