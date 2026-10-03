@@ -1,121 +1,212 @@
-import os
-import json
-from io import BytesIO
-from PIL import Image, ImageFilter, ImageDraw, ImageFont
-import requests
-from google import genai
-from google.genai import types
-from pydantic import BaseModel
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Deal Sanitizer & Auto-Masker</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f172a; color: #f8fafc; padding: 2rem; }
+    .container { max-width: 900px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; }
+    .card { background: #1e293b; padding: 1.5rem; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.5); }
+    .full-width { grid-column: span 2; }
+    label { display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.4rem; color: #94a3b8; }
+    input, textarea, select, button { width: 100%; box-sizing: border-box; margin-bottom: 1rem; padding: 0.6rem; border-radius: 6px; border: 1px solid #334155; background: #0f172a; color: #fff; }
+    button { background: #3b82f6; border: none; font-weight: bold; cursor: pointer; transition: background 0.2s; }
+    button:hover { background: #2563eb; }
+    canvas { max-width: 100%; height: auto; border-radius: 6px; background: #000; display: block; }
+    .preview-box { display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  </style>
+</head>
+<body>
 
-# Initialize Client
-client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
+<div class="container">
+  <div class="card full-width">
+    <h2>Automated Deal Asset Sanitizer</h2>
+    <label>Gemini API Key</label>
+    <input type="password" id="apiKey" placeholder="AIzaSy...">
+  </div>
 
-class LogoDetectionResult(BaseModel):
-    boxes: list[list[int]]  # Format: [[ymin, xmin, ymax, xmax], ...]
+  <!-- Left: Inputs -->
+  <div class="card">
+    <h3>Input Details</h3>
+    <label>Upload Product Image</label>
+    <input type="file" id="imageInput" accept="image/*">
 
-def detect_logos(image: Image.Image) -> list[list[int]]:
-    """Requests normalized bounding boxes for logos/brand names."""
-    buffered = BytesIO()
-    image.save(buffered, format="JPEG")
-    img_bytes = buffered.getvalue()
+    <label>Original Product Title & Details</label>
+    <textarea id="rawCopy" rows="4" placeholder="e.g., Clorox Disinfecting Wipes 3-Pack 75ct Lemon Scent, Original Retail $14.99"></textarea>
 
-    prompt = (
-        "Return bounding boxes for all brand logos, trademarks, and prominent "
-        "manufacturer brand text on the packaging as normalized 0-1000 integers [ymin, xmin, ymax, xmax]."
-    )
+    <label>Masking Mode</label>
+    <select id="maskMode">
+      <option value="ribbon">Deal Ribbon / Badge Stamp</option>
+      <option value="pixelate">Mosaic Pixelation</option>
+      <option value="blur">Gaussian Blur</option>
+    </select>
 
-    response = client.models.generate_content(
-        model="gemini-1.5-flash",
-        contents=[
-            types.Part.from_bytes(data=img_bytes, mime_type="image/jpeg"),
-            prompt
-        ],
-        config=types.GenerateContentConfig(
-            response_mime_type="application/json",
-            response_schema=LogoDetectionResult,
-            temperature=0.1
-        )
-    )
+    <button id="processBtn">Process & Sanitize</button>
+  </div>
 
-    result = json.loads(response.text)
-    return result.get("boxes", [])
+  <!-- Right: Masked Graphic Preview -->
+  <div class="card preview-box">
+    <h3>Masked Output</h3>
+    <canvas id="outputCanvas"></canvas>
+    <button id="downloadBtn" style="display:none; margin-top: 1rem; background: #10b981;">Download Image</button>
+  </div>
 
-def sanitize_copy(raw_title: str, raw_desc: str) -> str:
-    """Generates generic social copy stripping out brands and medical claims."""
-    prompt = f"""
-    Title: {raw_title}
-    Description: {raw_desc}
+  <!-- Bottom: Compliant Text Output -->
+  <div class="card full-width">
+    <h3>Sanitized Compliant Copy</h3>
+    <textarea id="cleanCopy" rows="3" readonly placeholder="Sanitized copy will appear here..."></textarea>
+    <button id="copyTextBtn" style="display:none;">Copy Text</button>
+  </div>
+</div>
 
-    Rewrite into a 2-sentence social deal post complying with these strict rules:
-    1. NEVER mention the brand name, parent company, or trademarked characters.
-    2. Replace all medical/disinfecting words ('disinfect', 'antibacterial', 'sanitizer') with generic terms ('surface wipes', 'cleaning solution', 'refresher').
-    3. Do not include raw dollar amounts.
-    """
-    response = client.models.generate_content(
-        model="gemini-1.5-flash",
-        contents=prompt
-    )
-    return response.text.strip()
+<script>
+  let base64Image = "";
+  const canvas = document.getElementById("outputCanvas");
+  const ctx = canvas.getContext("2d");
 
-def mask_image(image: Image.Image, boxes: list[list[int]], mode: str = "badge") -> Image.Image:
-    """Masks detected boxes with a decorative ribbon or heavy blur."""
-    img = image.copy()
-    w, h = img.size
+  // Load image to memory and initial render
+  document.getElementById("imageInput").addEventListener("change", function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
 
-    for box in boxes:
-        ymin, xmin, ymax, xmax = box
-        left = int((xmin / 1000) * w)
-        top = int((ymin / 1000) * h)
-        right = int((xmax / 1000) * w)
-        bottom = int((ymax / 1000) * h)
+    const reader = new FileReader();
+    reader.onload = function(evt) {
+      base64Image = evt.target.result.split(",")[1];
+      const img = new Image();
+      img.onload = () => {
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        ctx.drawImage(img, 0, 0);
+      };
+      img.src = evt.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
 
-        # Safety padding
-        pad = 6
-        box_tuple = (max(0, left - pad), max(0, top - pad), min(w, right + pad), min(h, bottom + pad))
+  document.getElementById("processBtn").addEventListener("click", async () => {
+    const key = document.getElementById("apiKey").value.trim();
+    const rawCopy = document.getElementById("rawCopy").value.trim();
+    const mode = document.getElementById("maskMode").value;
 
-        if mode == "blur":
-            crop_region = img.crop(box_tuple)
-            blurred = crop_region.filter(ImageFilter.GaussianBlur(radius=20))
-            img.paste(blurred, box_tuple)
+    if (!key || !base64Image) {
+      alert("Please provide an API Key and select an image.");
+      return;
+    }
 
-        elif mode == "badge":
-            draw = ImageDraw.Draw(img)
-            # Draw red banner background
-            draw.rectangle(box_tuple, fill="#dc2626")
-            # Stamp clean generic text badge
-            badge_text = "SPECIAL DEAL"
-            draw.text((box_tuple[0] + 5, box_tuple[1] + 5), badge_text, fill="#ffffff")
+    const btn = document.getElementById("processBtn");
+    btn.disabled = true;
+    btn.innerText = "Analyzing & Masking...";
 
-    return img
+    try {
+      // 1. Get Bounding Boxes from Gemini
+      const detectPrompt = "Locate all brand logos, manufacturer names, and trademark graphics. Return a valid JSON array of coordinate objects with key 'boxes': [[ymin, xmin, ymax, xmax]], where coordinates are normalized 0-1000 integers. Do not include markdown codeblocks.";
+      
+      const detectResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{
+            parts: [
+              { text: detectPrompt },
+              { inline_data: { mime_type: "image/jpeg", data: base64Image } }
+            ]
+          }],
+          generationConfig: { response_mime_type: "application/json" }
+        })
+      });
 
-def process_deal(image_path_or_url: str, title: str, desc: str, output_img_path: str):
-    # Load image
-    if image_path_or_url.startswith("http"):
-        resp = requests.get(image_path_or_url)
-        img = Image.open(BytesIO(resp.content)).convert("RGB")
-    else:
-        img = Image.open(image_path_or_url).convert("RGB")
+      const detectData = await detectResponse.json();
+      const parsedBoxes = JSON.parse(detectData.candidates[0].content.parts[0].text);
+      const boxes = parsedBoxes.boxes || parsedBoxes;
 
-    print(f"Detecting logos for: {title[:30]}...")
-    boxes = detect_logos(img)
-    print(f"Found {len(boxes)} regions to mask.")
+      // 2. Apply Masking to Canvas
+      boxes.forEach(box => {
+        const [ymin, xmin, ymax, xmax] = box;
+        const x = (xmin / 1000) * canvas.width;
+        const y = (ymin / 1000) * canvas.height;
+        const w = ((xmax - xmin) / 1000) * canvas.width;
+        const h = ((ymax - ymin) / 1000) * canvas.height;
 
-    # Mask graphic
-    final_img = mask_image(img, boxes, mode="badge")
-    final_img.save(output_img_path, "JPEG", quality=90)
+        if (mode === "pixelate") {
+          applyPixelation(x, y, w, h);
+        } else if (mode === "blur") {
+          applyBlur(x, y, w, h);
+        } else {
+          applyRibbonBadge(x, y, w, h);
+        }
+      });
 
-    # Sanitize copy
-    clean_copy = sanitize_copy(title, desc)
+      // 3. Generate Sanitized Copy
+      if (rawCopy) {
+        const copyPrompt = `Analyze this deal description: "${rawCopy}". Rewrite it into a 2-sentence deal post. STRICT RULES: 1) Never mention the brand name, parent company, or trademarked characters. 2) Replace any health or medical claim words ('disinfect', 'sanitizer', 'antibacterial') with generic equivalents ('cleaning', 'surface wipes'). 3) Do not include raw dollar amounts.`;
 
-    print("\n--- RESULTS ---")
-    print(f"Saved Image: {output_img_path}")
-    print(f"Compliant Copy:\n{clean_copy}\n")
+        const copyResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ contents: [{ parts: [{ text: copyPrompt }] }] })
+        });
 
-if __name__ == "__main__":
-    # Example execution
-    process_deal(
-        image_path_or_url="https://images.unsplash.com/photo-1583947215259-38e31be8751f", # Sample sanitizer bottle
-        title="Purell Advanced Hand Sanitizer Refreshing Gel 2-Pack",
-        desc="Kills 99.99% of germs. Medical-grade antibacterial formula for $8.99.",
-        output_img_path="sanitized_deal.jpg"
-    )
+        const copyData = await copyResponse.json();
+        document.getElementById("cleanCopy").value = copyData.candidates[0].content.parts[0].text.trim();
+        document.getElementById("copyTextBtn").style.display = "block";
+      }
+
+      document.getElementById("downloadBtn").style.display = "block";
+    } catch (err) {
+      console.error(err);
+      alert("Error processing: " + err.message);
+    } finally {
+      btn.disabled = false;
+      btn.innerText = "Process & Sanitize";
+    }
+  });
+
+  // Canvas Masking Effects
+  function applyRibbonBadge(x, y, w, h) {
+    ctx.save();
+    ctx.fillStyle = "#ef4444";
+    ctx.fillRect(x - 5, y - 5, w + 10, h + 10);
+    ctx.fillStyle = "#ffffff";
+    ctx.font = `bold ${Math.max(14, Math.floor(h * 0.45))}px sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("DEAL DROP", x + w / 2, y + h / 2);
+    ctx.restore();
+  }
+
+  function applyPixelation(x, y, w, h) {
+    const size = 0.08;
+    const offCanvas = document.createElement("canvas");
+    offCanvas.width = Math.max(1, w * size);
+    offCanvas.height = Math.max(1, h * size);
+    const offCtx = offCanvas.getContext("2d");
+
+    offCtx.drawImage(canvas, x, y, w, h, 0, 0, offCanvas.width, offCanvas.height);
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(offCanvas, 0, 0, offCanvas.width, offCanvas.height, x, y, w, h);
+    ctx.imageSmoothingEnabled = true;
+  }
+
+  function applyBlur(x, y, w, h) {
+    ctx.save();
+    ctx.filter = "blur(16px)";
+    ctx.drawImage(canvas, x, y, w, h, x, y, w, h);
+    ctx.restore();
+  }
+
+  // Download Output
+  document.getElementById("downloadBtn").addEventListener("click", () => {
+    const link = document.createElement("a");
+    link.download = "sanitized-deal.png";
+    link.href = canvas.toDataURL("image/png");
+    link.click();
+  });
+
+  // Copy text helper
+  document.getElementById("copyTextBtn").addEventListener("click", () => {
+    navigator.clipboard.writeText(document.getElementById("cleanCopy").value);
+    alert("Copy copied to clipboard!");
+  });
+</script>
+</body>
+</html>
