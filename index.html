@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Deal Sanitizer & Auto-Masker v1.0.04</title>
+  <title>Deal Sanitizer & Auto-Masker v1.0.05</title>
   <style>
     body { 
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
@@ -43,20 +43,45 @@
 
     canvas { max-width: 100%; height: auto; border-radius: 6px; background: #000; display: block; cursor: crosshair; }
     .preview-box { display: flex; flex-direction: column; align-items: center; justify-content: flex-start; }
-    .status-msg { font-size: 0.75rem; color: #38bdf8; margin-top: -0.5rem; margin-bottom: 0.75rem; }
     .hint { font-size: 0.75rem; color: #94a3b8; margin-top: 0.3rem; margin-bottom: 1rem; }
+
+    /* Poster Suggestions Box */
+    .suggestions-container {
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-left: 4px solid #38bdf8;
+      border-radius: 6px;
+      padding: 1rem 1.25rem;
+      margin-top: 1rem;
+    }
+    .suggestions-title {
+      font-size: 0.9rem;
+      font-weight: bold;
+      color: #38bdf8;
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .suggestions-list {
+      margin: 0;
+      padding-left: 1.2rem;
+      color: #cbd5e1;
+      font-size: 0.85rem;
+      line-height: 1.5;
+    }
+    .suggestions-list li { margin-bottom: 0.35rem; }
   </style>
 </head>
 <body>
 
-<div class="app-version">v1.0.04</div>
+<div class="app-version">v1.0.05</div>
 
 <div class="container">
   <div class="card full-width">
     <h2>Automated Deal Asset Sanitizer</h2>
     <label>Gemini API Key</label>
     <input type="password" id="apiKey" placeholder="AIzaSy...">
-    <div id="keyStatus" class="status-msg" style="display:none;"></div>
 
     <label>Gemini Model</label>
     <select id="modelSelect">
@@ -77,16 +102,25 @@
 
     <label>Sanitization Scope</label>
     <select id="sanitizationScope">
-      <option value="aggressive" selected>Full Scrub: Brand Logos + Sanitizer/Medical Claims</option>
+      <option value="aggressive" selected>Full Deep Scrub (Logos + Claims + "Sanitizer" + Banners)</option>
       <option value="logos_only">Brand Logos & Trademarks Only</option>
     </select>
 
     <label>Masking Visual Style</label>
     <select id="maskMode">
-      <option value="blur" selected>Gaussian Blur (Clean & Natural)</option>
+      <option value="blur" selected>Zero-Leak Frosted Blur (OCR Proof)</option>
+      <option value="ribbon">Decorative Deal Ribbon Stamp</option>
       <option value="pixelate">Mosaic Pixelation</option>
-      <option value="ribbon">Deal Ribbon / Badge Stamp</option>
-      <option value="solid">Clean Black Tape</option>
+      <option value="solid">Clean Dark Tape</option>
+    </select>
+
+    <label>Ribbon Badge Text (if using Deal Ribbon)</label>
+    <select id="badgeTextSelect">
+      <option value="BUNDLE DEAL" selected>BUNDLE DEAL</option>
+      <option value="LIMITED DEAL">LIMITED DEAL</option>
+      <option value="SPECIAL OFFER">SPECIAL OFFER</option>
+      <option value="SUPER VALUE">SUPER VALUE</option>
+      <option value="EXCLUSIVE">EXCLUSIVE</option>
     </select>
 
     <label>Product Title / Deal Notes</label>
@@ -111,11 +145,21 @@
     </div>
   </div>
 
-  <!-- Bottom: Sanitized Copy Output -->
+  <!-- Bottom: Sanitized Copy & Suggestions for the Poster -->
   <div class="card full-width">
     <h3>Sanitized Compliant Copy</h3>
     <textarea id="cleanCopy" rows="3" readonly placeholder="Compliant copy will appear here..."></textarea>
-    <button id="copyTextBtn" style="display:none;">Copy Text to Clipboard</button>
+    <button id="copyTextBtn" style="display:none; width: auto; padding: 0.5rem 1rem;">Copy Caption to Clipboard</button>
+
+    <!-- NEW: Poster Suggestions Component -->
+    <div id="posterSuggestions" class="suggestions-container" style="display:none;">
+      <div class="suggestions-title">
+        <span>💡</span> Suggestions & Compliance Tips for the Poster
+      </div>
+      <ul id="suggestionsList" class="suggestions-list">
+        <!-- Rendered dynamically -->
+      </ul>
+    </div>
   </div>
 </div>
 
@@ -124,11 +168,9 @@
   let imageMimeType = "image/jpeg";
   let loadedImage = null;
 
-  // Stored state for coordinates
   let aiBoxes = [];
   let manualBoxes = [];
 
-  // Drag-to-mask state
   let isDragging = false;
   let dragStartX = 0;
   let dragStartY = 0;
@@ -172,6 +214,7 @@
     document.getElementById("imageInput").value = "";
     document.getElementById("rawCopy").value = "";
     document.getElementById("cleanCopy").value = "";
+    document.getElementById("posterSuggestions").style.display = "none";
     loadedImage = null;
     base64Image = "";
     aiBoxes = [];
@@ -187,7 +230,7 @@
     renderAllMasks();
   });
 
-  // Undo last manual mask
+  // Undo last mask
   document.getElementById("undoBtn").addEventListener("click", () => {
     if (manualBoxes.length > 0) {
       manualBoxes.pop();
@@ -210,13 +253,13 @@
 
     const btn = document.getElementById("processBtn");
     btn.disabled = true;
-    btn.innerText = "Analyzing Everything...";
+    btn.innerText = "Scanning Packaging & Claims...";
 
     try {
-      // Extended prompt for claims + logos
+      // Prompt targeting logos, text, claims, and banners
       let detectPrompt = "";
       if (scope === "aggressive") {
-        detectPrompt = "Detect and return bounding boxes for: 1) All brand logos and brand names (e.g., Lysol, Clorox). 2) All regulated medical, sanitizing, or antimicrobial buzzwords and claims including 'AIR SANITIZER', 'SANITIZER', 'DISINFECTANT', 'ANTIBACTERIAL', 'KILLING 99.9%', 'VIRUSES', 'BACTERIA', 'GERMS'. Return a JSON object with key 'boxes': [[ymin, xmin, ymax, xmax]] (normalized 0 to 1000 integers).";
+        detectPrompt = "Locate all brand logos (e.g., Lysol, Clorox), trademarks, AND every piece of regulated medical/sanitizing text on the packaging including 'AIR SANITIZER', 'SANITIZER', 'DISINFECTANT', 'ANTIBACTERIAL', 'KILLING 99.9%', 'VIRUSES', 'BACTERIA', 'SCIENTIFICALLY PROVEN', and claim banners across packaging bands. Return a JSON object with key 'boxes': [[ymin, xmin, ymax, xmax]] (normalized 0 to 1000 integers).";
       } else {
         detectPrompt = "Detect all brand logos and trademarks in this image. Return a JSON object with key 'boxes': [[ymin, xmin, ymax, xmax]] (normalized 0 to 1000 integers).";
       }
@@ -237,19 +280,58 @@
 
       renderAllMasks();
 
-      // Copy Generation
-      if (rawCopy) {
-        const copyPrompt = `Rewrite this product description: "${rawCopy}" into a 2-sentence social deal post. STRICT RULES: 1) Never mention the brand name, parent company, or trademarked characters. 2) Replace any health or medical claim words ('disinfect', 'disinfecting', 'sanitizer', 'antibacterial') with generic equivalents ('cleaning spray', 'surface spray', 'refresher'). 3) Do not include raw dollar amounts.`;
-        const copyData = await callGeminiWithFallback(key, {
-          contents: [{ parts: [{ text: copyPrompt }] }]
-        }, selectedModel);
+      // Copy & Poster Suggestions Generation
+      const copyPrompt = `
+      Product: "${rawCopy || 'Cleaning/Aerosol Multipack'}".
+      Tasks:
+      1. Write a 2-sentence social deal post. RULES: Never mention brand names, parent company, or medical claim words ('disinfect', 'sanitizer', 'antibacterial'). Use generic terms like 'cleaning spray', 'room refresher'. Do not mention dollar amounts.
+      2. Provide 3 concise bullet suggestions for the affiliate deal poster explaining how to safely post this deal graphic on social channels (mentioning stamping ribbons over claim strips, keeping pack sizes visible, and avoiding restricted keywords in comments).
+      
+      Return a clean JSON object:
+      {
+        "caption": "your 2-sentence deal post",
+        "suggestions": [
+          "Suggestion 1",
+          "Suggestion 2",
+          "Suggestion 3"
+        ]
+      }
+      `;
 
-        if (copyData.candidates && copyData.candidates[0]?.content?.parts[0]?.text) {
-          document.getElementById("cleanCopy").value = copyData.candidates[0].content.parts[0].text.trim();
-          document.getElementById("copyTextBtn").style.display = "block";
+      const copyData = await callGeminiWithFallback(key, {
+        contents: [{ parts: [{ text: copyPrompt }] }]
+      }, selectedModel);
+
+      let copyRaw = copyData.candidates[0]?.content?.parts[0]?.text || "{}";
+      copyRaw = copyRaw.replace(/```json/g, "").replace(/```/g, "").trim();
+      
+      try {
+        const copyJson = JSON.parse(copyRaw);
+        document.getElementById("cleanCopy").value = copyJson.caption || copyRaw;
+        
+        // Render Suggestions
+        const suggestionsBox = document.getElementById("posterSuggestions");
+        const list = document.getElementById("suggestionsList");
+        list.innerHTML = "";
+
+        // Default smart suggestion about ribbons vs blurs
+        const defaultTip = document.createElement("li");
+        defaultTip.innerHTML = `<b>Ribbon vs Blur:</b> Consider stamping a solid <b>"BUNDLE DEAL"</b> or <b>"LIMITED DEAL"</b> ribbon directly over the middle red claim strip. This fully blocks OCR text crawlers while increasing viewer engagement.`;
+        list.appendChild(defaultTip);
+
+        if (Array.isArray(copyJson.suggestions)) {
+          copyJson.suggestions.forEach(tip => {
+            const li = document.createElement("li");
+            li.textContent = tip;
+            list.appendChild(li);
+          });
         }
+        suggestionsBox.style.display = "block";
+      } catch (e) {
+        document.getElementById("cleanCopy").value = copyRaw;
       }
 
+      document.getElementById("copyTextBtn").style.display = "inline-block";
       document.getElementById("downloadBtn").style.display = "inline-block";
     } catch (err) {
       console.error(err);
@@ -260,7 +342,7 @@
     }
   });
 
-  // Render Pipeline: redraws original image, then applies all boxes
+  // Render Pipeline
   function renderAllMasks() {
     if (!loadedImage) return;
 
@@ -268,6 +350,7 @@
     ctx.drawImage(loadedImage, 0, 0);
 
     const mode = document.getElementById("maskMode").value;
+    const badgeText = document.getElementById("badgeTextSelect").value;
     const allBoxes = [...aiBoxes, ...manualBoxes];
 
     allBoxes.forEach(box => {
@@ -280,32 +363,45 @@
       if (mode === "pixelate") {
         applyPixelation(x, y, w, h);
       } else if (mode === "ribbon") {
-        applyCleanRibbon(x, y, w, h);
+        applyCleanRibbon(x, y, w, h, badgeText);
       } else if (mode === "solid") {
         applySolidTape(x, y, w, h);
       } else {
-        applyBlur(x, y, w, h);
+        applyZeroLeakBlur(x, y, w, h);
       }
     });
 
     document.getElementById("downloadBtn").style.display = "inline-block";
   }
 
-  // Visual Mask Functions
-  function applyBlur(x, y, w, h) {
+  // Zero-Leak Frosted Blur (Pixelates text first, then blurs to completely kill OCR text stems)
+  function applyZeroLeakBlur(x, y, w, h) {
     ctx.save();
     ctx.beginPath();
-    ctx.rect(x - 2, y - 2, w + 4, h + 4);
+    ctx.rect(x - 3, y - 3, w + 6, h + 6);
     ctx.clip();
-    ctx.filter = "blur(24px)";
-    // Multi-pass blur for strong coverage of high-res packaging
+
+    // 1. Heavy downsample to destroy character glyphs
+    const scale = 0.035;
+    const off = document.createElement("canvas");
+    off.width = Math.max(1, Math.floor(w * scale));
+    off.height = Math.max(1, Math.floor(h * scale));
+    const offCtx = off.getContext("2d");
+
+    offCtx.drawImage(canvas, x, y, w, h, 0, 0, off.width, off.height);
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(off, 0, 0, off.width, off.height, x, y, w, h);
+
+    // 2. Multi-pass Gaussian blur over the mosaic for a clean frosted aesthetic
+    ctx.filter = "blur(20px)";
     ctx.drawImage(canvas, x - 10, y - 10, w + 20, h + 20, x - 10, y - 10, w + 20, h + 20);
     ctx.drawImage(canvas, x - 10, y - 10, w + 20, h + 20, x - 10, y - 10, w + 20, h + 20);
+
     ctx.restore();
   }
 
   function applyPixelation(x, y, w, h) {
-    const scale = 0.05;
+    const scale = 0.04;
     const off = document.createElement("canvas");
     off.width = Math.max(1, Math.floor(w * scale));
     off.height = Math.max(1, Math.floor(h * scale));
@@ -317,26 +413,27 @@
     ctx.imageSmoothingEnabled = true;
   }
 
-  function applyCleanRibbon(x, y, w, h) {
+  function applyCleanRibbon(x, y, w, h, text) {
     ctx.save();
-    // Constrain badge inside its box
     ctx.beginPath();
     ctx.rect(x, y, w, h);
     ctx.clip();
 
-    ctx.fillStyle = "#ef4444";
+    // Clean gradient ribbon
+    const grad = ctx.createLinearGradient(x, y, x + w, y + h);
+    grad.addColorStop(0, "#ef4444");
+    grad.addColorStop(1, "#b91c1c");
+    ctx.fillStyle = grad;
     ctx.fillRect(x, y, w, h);
 
-    // Calculate font to fit width and height properly
-    const label = "SPECIAL DEAL";
-    let fontSize = Math.min(h * 0.35, w * 0.16);
-    fontSize = Math.max(10, Math.floor(fontSize));
+    let fontSize = Math.min(h * 0.4, w * 0.15);
+    fontSize = Math.max(11, Math.floor(fontSize));
 
     ctx.font = `bold ${fontSize}px sans-serif`;
     ctx.fillStyle = "#ffffff";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(label, x + w / 2, y + h / 2, w - 8);
+    ctx.fillText(text, x + w / 2, y + h / 2, w - 6);
     ctx.restore();
   }
 
@@ -347,7 +444,7 @@
     ctx.restore();
   }
 
-  // Interactive Drag-to-Mask (Canvas Mouse Handlers)
+  // Interactive Drag-to-Mask
   function getCanvasCoords(evt) {
     const rect = canvas.getBoundingClientRect();
     const scaleX = canvas.width / rect.width;
@@ -371,7 +468,6 @@
     const pt = getCanvasCoords(e);
     renderAllMasks();
 
-    // Draw active selection box preview
     ctx.save();
     ctx.strokeStyle = "#38bdf8";
     ctx.lineWidth = 3;
@@ -390,7 +486,6 @@
     const x2 = Math.max(dragStartX, pt.x);
     const y2 = Math.max(dragStartY, pt.y);
 
-    // Convert pixel to normalized 0-1000 coordinates
     if (x2 - x1 > 8 && y2 - y1 > 8) {
       manualBoxes.push([
         Math.round((y1 / canvas.height) * 1000),
@@ -402,7 +497,7 @@
     renderAllMasks();
   });
 
-  // API Call Fallback
+  // Fallback API Call
   async function callGeminiWithFallback(key, body, initialModel) {
     const candidateModels = [
       initialModel,
@@ -440,10 +535,10 @@
     throw lastError || new Error("All active Gemini models failed.");
   }
 
-  // Download & Copy
+  // Export & Copy
   document.getElementById("downloadBtn").addEventListener("click", () => {
     const link = document.createElement("a");
-    link.download = "sanitized-product.png";
+    link.download = "sanitized-deal.png";
     link.href = canvas.toDataURL("image/png");
     link.click();
   });
