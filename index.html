@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Deal Sanitizer & Auto-Masker v1.0.06</title>
+  <title>Deal Sanitizer & Auto-Masker v1.0.07</title>
   <style>
     body { 
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
@@ -12,15 +12,34 @@
       position: relative;
     }
     
-    .app-version {
-      position: absolute;
+    /* Top-Right Version Pill */
+    .app-version-fixed {
+      position: fixed;
       top: 1rem;
       right: 1.5rem;
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-      font-size: 0.75rem;
-      color: #64748b;
-      letter-spacing: 0.05em;
-      user-select: none;
+      font-size: 0.8rem;
+      font-weight: bold;
+      color: #38bdf8;
+      background: #1e293b;
+      padding: 0.25rem 0.6rem;
+      border-radius: 9999px;
+      border: 1px solid #0284c7;
+      z-index: 9999;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+    }
+
+    /* Header Title Badge */
+    .version-header-badge {
+      display: inline-block;
+      font-size: 0.85rem;
+      background: #0284c7;
+      color: #ffffff;
+      padding: 0.2rem 0.5rem;
+      border-radius: 6px;
+      vertical-align: middle;
+      margin-left: 0.5rem;
+      font-weight: 600;
     }
 
     .container { max-width: 1000px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; }
@@ -44,6 +63,12 @@
     canvas { max-width: 100%; height: auto; border-radius: 6px; background: #000; display: block; cursor: crosshair; }
     .preview-box { display: flex; flex-direction: column; align-items: center; justify-content: flex-start; }
     .hint { font-size: 0.75rem; color: #94a3b8; margin-top: 0.3rem; margin-bottom: 1rem; }
+
+    /* Suggested Title Container */
+    .title-row { display: flex; gap: 0.5rem; }
+    .title-row input { margin-bottom: 0; font-size: 0.95rem; font-weight: 500; color: #38bdf8; background: #090d16; border-color: #0284c7; }
+    .title-row button { width: 140px; margin-bottom: 0; background: #0284c7; }
+    .title-row button:hover { background: #0369a1; }
 
     /* Poster Suggestions Box */
     .suggestions-container {
@@ -75,11 +100,17 @@
 </head>
 <body>
 
-<div class="app-version">v1.0.06</div>
+<!-- Fixed Top-Right Badge -->
+<div class="app-version-fixed">v1.0.07</div>
 
 <div class="container">
+  <!-- Top Settings Header -->
   <div class="card full-width">
-    <h2>Automated Deal Asset Sanitizer</h2>
+    <h2>
+      Automated Deal Asset Sanitizer 
+      <span class="version-header-badge">v1.0.07</span>
+    </h2>
+    
     <label>Gemini API Key</label>
     <input type="password" id="apiKey" placeholder="AIzaSy...">
 
@@ -93,7 +124,7 @@
     </select>
   </div>
 
-  <!-- Left: Controls -->
+  <!-- Left: Inputs -->
   <div class="card">
     <h3>Input Controls</h3>
     
@@ -102,8 +133,8 @@
 
     <label>Sanitization Scope</label>
     <select id="sanitizationScope">
-      <option value="aggressive" selected>Full Deep Scrub (Logos + Claims + "Sanitizer" + Banners)</option>
-      <option value="logos_only">Brand Logos & Trademarks Only</option>
+      <option value="co_branded" selected>Deep Scan: Primary Logos + Co-Brands (OxiClean, etc.) + Claims</option>
+      <option value="logos_only">Primary Brand Logos Only</option>
     </select>
 
     <label>Masking Visual Style</label>
@@ -126,13 +157,22 @@
   <!-- Right: Canvas Preview -->
   <div class="card preview-box">
     <h3>Masked Output Preview</h3>
-    <div class="hint">💡 <b>Tip:</b> Click and drag directly on the image below to manually mask anything the AI missed.</div>
+    <div class="hint">💡 <b>Tip:</b> Click and drag directly on the image to manually mask any missed secondary text.</div>
     <canvas id="outputCanvas"></canvas>
     
     <div class="btn-row" style="width: 100%; margin-top: 1rem;">
       <button id="reapplyBtn" class="secondary" title="Switch mask style without re-calling API">Re-apply Style</button>
       <button id="undoBtn" class="secondary" title="Remove the last manual box">Undo Last Mask</button>
       <button id="downloadBtn" class="success" style="display:none;">Download Image</button>
+    </div>
+  </div>
+
+  <!-- Bottom: Suggested Title Box -->
+  <div class="card full-width">
+    <label style="font-size: 0.95rem; color: #38bdf8; font-weight: bold;">Suggested Compliant Title (Brand-Free)</label>
+    <div class="title-row">
+      <input type="text" id="suggestedTitle" readonly placeholder="Compliant, generic title will automatically appear here after processing...">
+      <button id="copyTitleBtn">Copy Title</button>
     </div>
   </div>
 
@@ -193,7 +233,7 @@
     reader.readAsDataURL(file);
   });
 
-  // Button 1: Reset Masks (clears masks on current image, keeps photo)
+  // Reset Masks on Current Image
   document.getElementById("resetMasksBtn").addEventListener("click", () => {
     if (!loadedImage) return;
     aiBoxes = [];
@@ -201,13 +241,14 @@
     renderAllMasks();
   });
 
-  // Button 2: Upload New Image (clears everything and immediately opens file dialog)
+  // Upload New Image
   document.getElementById("uploadNewBtn").addEventListener("click", () => {
     loadedImage = null;
     base64Image = "";
     aiBoxes = [];
     manualBoxes = [];
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    document.getElementById("suggestedTitle").value = "";
     document.getElementById("posterSuggestions").style.display = "none";
     document.getElementById("downloadBtn").style.display = "none";
     
@@ -216,7 +257,7 @@
     fileInput.click();
   });
 
-  // Re-apply style without re-calling the API
+  // Re-apply style without calling API again
   document.getElementById("reapplyBtn").addEventListener("click", () => {
     if (!loadedImage) return;
     renderAllMasks();
@@ -233,7 +274,7 @@
     }
   });
 
-  // Process with AI (Single lightweight call with Flash-Lite)
+  // Process with AI
   document.getElementById("processBtn").addEventListener("click", async () => {
     const key = keyInput.value.trim();
     const scope = document.getElementById("sanitizationScope").value;
@@ -244,37 +285,36 @@
 
     const btn = document.getElementById("processBtn");
     btn.disabled = true;
-    btn.innerText = "Scanning Packaging & Claims...";
+    btn.innerText = "Scanning Dual-Logos & Claims...";
 
     try {
-      let detectPrompt = "";
-      if (scope === "aggressive") {
-        detectPrompt = `
-        Analyze this deal product image.
-        Tasks:
-        1. Detect bounding boxes for: all brand logos, manufacturer names, AND restricted claims ('AIR SANITIZER', 'SANITIZER', 'DISINFECTANT', 'ANTIBACTERIAL', 'KILLING 99.9%', 'VIRUSES', 'BACTERIA', 'SCIENTIFICALLY PROVEN', and claim banners across packaging bands).
-        2. Provide 2-3 brief bullet suggestions for the affiliate deal poster on graphic safety and posting guidelines.
-        
-        Return JSON format:
-        {
-          "boxes": [[ymin, xmin, ymax, xmax]],
-          "suggestions": ["Suggestion 1", "Suggestion 2"]
-        }
-        `;
-      } else {
-        detectPrompt = `
-        Analyze this deal product image.
-        Tasks:
-        1. Detect all brand logos and trademarks. Return normalized boxes [ymin, xmin, ymax, xmax] (0 to 1000).
-        2. Provide 2-3 brief bullet suggestions for the affiliate deal poster.
-        
-        Return JSON format:
-        {
-          "boxes": [[ymin, xmin, ymax, xmax]],
-          "suggestions": ["Suggestion 1", "Suggestion 2"]
-        }
-        `;
+      const detectPrompt = `
+      Analyze this product packaging for affiliate deal posting compliance.
+
+      TASK 1: CO-BRAND & TRADEMARK DETECTION (CRITICAL)
+      Detect ALL registered trademarks, brand names, sub-brands, partner ingredients, and claims on the entire packaging.
+      Many products have DUAL or CO-BRANDED logos (e.g. "Arm & Hammer" AND "OxiClean", "Tide" AND "Downy/Febreze", "Lysol" AND "Air Wick").
+      You MUST return bounding boxes for:
+      - Primary header brand logo/emblem (e.g., Arm & Hammer)
+      - Secondary co-brands, ingredient brand partner logos, or sub-brand badges (e.g., "OxiClean", "Febreze", "Downy", "Clorox")
+      - Health, sanitizer, or pesticide claims ('AIR SANITIZER', 'SANITIZER', 'DISINFECTANT', 'ANTIBACTERIAL', 'KILLING 99.9%', 'VIRUSES', 'BACTERIA', 'SCIENTIFICALLY PROVEN').
+      Return normalized coordinates [ymin, xmin, ymax, xmax] (0 to 1000 integers).
+
+      TASK 2: SUGGESTED COMPLIANT TITLE
+      Generate a generic, brand-free deal post title based on the package specifications (count, pack size, scent, product type).
+      STRICT RULE: Absolutely DO NOT include ANY brand or trademark name (no "Arm & Hammer", no "OxiClean", no "Tide", etc.).
+      Example: "72-Count 5-in-1 Laundry Detergent Power Paks - Fresh Scent"
+
+      TASK 3: POSTER SUGGESTIONS
+      Provide 2-3 brief bullet suggestions for the affiliate poster.
+
+      Return JSON:
+      {
+        "boxes": [[ymin, xmin, ymax, xmax]],
+        "suggested_title": "...",
+        "suggestions": ["...", "..."]
       }
+      `;
 
       const detectData = await callGeminiWithFallback(key, {
         contents: [{
@@ -292,13 +332,18 @@
       aiBoxes = Array.isArray(parsed) ? parsed : (parsed.boxes || []);
       renderAllMasks();
 
+      // Render Suggested Title
+      if (parsed.suggested_title) {
+        document.getElementById("suggestedTitle").value = parsed.suggested_title;
+      }
+
       // Render Suggestions
       const suggestionsBox = document.getElementById("posterSuggestions");
       const list = document.getElementById("suggestionsList");
       list.innerHTML = "";
 
       const defaultTip = document.createElement("li");
-      defaultTip.innerHTML = `<b>Compliance Check:</b> Ensure buzzwords like <i>"Sanitizer"</i> or <i>"Killing 99.9%"</i> on packaging bands are fully covered to avoid crawler flags.`;
+      defaultTip.innerHTML = `<b>Co-Brand Notice:</b> Watch out for ingredient partners (like <i>OxiClean</i> or <i>Febreze</i>). Both must be masked.`;
       list.appendChild(defaultTip);
 
       if (parsed.suggestions && Array.isArray(parsed.suggestions)) {
@@ -349,7 +394,7 @@
     document.getElementById("downloadBtn").style.display = "inline-block";
   }
 
-  // Zero-Leak Frosted Blur (Pixelates text first, then blurs to kill OCR character stems)
+  // Zero-Leak Frosted Blur (Destroys character glyphs, then blurs)
   function applyZeroLeakBlur(x, y, w, h) {
     ctx.save();
     ctx.beginPath();
@@ -446,7 +491,15 @@
     renderAllMasks();
   });
 
-  // Fallback API Call
+  // Copy Title Helper
+  document.getElementById("copyTitleBtn").addEventListener("click", () => {
+    const title = document.getElementById("suggestedTitle").value;
+    if (!title) return;
+    navigator.clipboard.writeText(title);
+    alert("Title copied to clipboard!");
+  });
+
+  // API Call Fallback
   async function callGeminiWithFallback(key, body, initialModel) {
     const candidateModels = [
       initialModel,
