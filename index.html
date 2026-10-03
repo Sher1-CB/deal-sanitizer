@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Deal Sanitizer & Auto-Masker v1.0.07</title>
+  <title>Deal Sanitizer & Auto-Masker v1.0.08</title>
   <style>
     body { 
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
@@ -60,6 +60,8 @@
     .btn-row { display: flex; gap: 0.5rem; margin-bottom: 0.75rem; }
     .btn-row button { margin-bottom: 0; }
 
+    .grid-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+
     canvas { max-width: 100%; height: auto; border-radius: 6px; background: #000; display: block; cursor: crosshair; }
     .preview-box { display: flex; flex-direction: column; align-items: center; justify-content: flex-start; }
     .hint { font-size: 0.75rem; color: #94a3b8; margin-top: 0.3rem; margin-bottom: 1rem; }
@@ -101,14 +103,14 @@
 <body>
 
 <!-- Fixed Top-Right Badge -->
-<div class="app-version-fixed">v1.0.07</div>
+<div class="app-version-fixed">v1.0.08</div>
 
 <div class="container">
   <!-- Top Settings Header -->
   <div class="card full-width">
     <h2>
       Automated Deal Asset Sanitizer 
-      <span class="version-header-badge">v1.0.07</span>
+      <span class="version-header-badge">v1.0.08</span>
     </h2>
     
     <label>Gemini API Key</label>
@@ -124,7 +126,7 @@
     </select>
   </div>
 
-  <!-- Left: Inputs -->
+  <!-- Left: Inputs & Configuration -->
   <div class="card">
     <h3>Input Controls</h3>
     
@@ -133,7 +135,7 @@
 
     <label>Sanitization Scope</label>
     <select id="sanitizationScope">
-      <option value="co_branded" selected>Deep Scan: Primary Logos + Co-Brands (OxiClean, etc.) + Claims</option>
+      <option value="co_branded" selected>Deep Scan: Primary Logos + Co-Brands + Taglines</option>
       <option value="logos_only">Primary Brand Logos Only</option>
     </select>
 
@@ -143,6 +145,26 @@
       <option value="pixelate">Mosaic Pixelation</option>
       <option value="solid">Clean Dark Tape</option>
     </select>
+
+    <!-- NEW: Margin Padding & Cluster Merging Controls -->
+    <div class="grid-2col">
+      <div>
+        <label>Mask Margin (Padding)</label>
+        <select id="paddingSelect">
+          <option value="0.10">Tight (10%)</option>
+          <option value="0.20" selected>Generous (20% - Recommended)</option>
+          <option value="0.30">Wide (30%)</option>
+          <option value="0.40">Maximum (40%)</option>
+        </select>
+      </div>
+      <div>
+        <label>Merge Stacked Boxes</label>
+        <select id="mergeSelect">
+          <option value="true" selected>Yes - Fuse Clusters</option>
+          <option value="false">No - Keep Separate</option>
+        </select>
+      </div>
+    </div>
 
     <div class="btn-row" style="margin-top: 1.5rem;">
       <button id="processBtn">Process Image with AI</button>
@@ -161,7 +183,7 @@
     <canvas id="outputCanvas"></canvas>
     
     <div class="btn-row" style="width: 100%; margin-top: 1rem;">
-      <button id="reapplyBtn" class="secondary" title="Switch mask style without re-calling API">Re-apply Style</button>
+      <button id="reapplyBtn" class="secondary" title="Re-apply padding/merge settings without calling API">Re-apply Style</button>
       <button id="undoBtn" class="secondary" title="Remove the last manual box">Undo Last Mask</button>
       <button id="downloadBtn" class="success" style="display:none;">Download Image</button>
     </div>
@@ -192,7 +214,7 @@
   let imageMimeType = "image/jpeg";
   let loadedImage = null;
 
-  let aiBoxes = [];
+  let rawAiBoxes = [];
   let manualBoxes = [];
 
   let isDragging = false;
@@ -224,7 +246,7 @@
       loadedImage.onload = () => {
         canvas.width = loadedImage.naturalWidth;
         canvas.height = loadedImage.naturalHeight;
-        aiBoxes = [];
+        rawAiBoxes = [];
         manualBoxes = [];
         renderAllMasks();
       };
@@ -236,7 +258,7 @@
   // Reset Masks on Current Image
   document.getElementById("resetMasksBtn").addEventListener("click", () => {
     if (!loadedImage) return;
-    aiBoxes = [];
+    rawAiBoxes = [];
     manualBoxes = [];
     renderAllMasks();
   });
@@ -245,7 +267,7 @@
   document.getElementById("uploadNewBtn").addEventListener("click", () => {
     loadedImage = null;
     base64Image = "";
-    aiBoxes = [];
+    rawAiBoxes = [];
     manualBoxes = [];
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     document.getElementById("suggestedTitle").value = "";
@@ -257,7 +279,7 @@
     fileInput.click();
   });
 
-  // Re-apply style without calling API again
+  // Re-apply style instantly (with new padding or merge settings)
   document.getElementById("reapplyBtn").addEventListener("click", () => {
     if (!loadedImage) return;
     renderAllMasks();
@@ -268,13 +290,13 @@
     if (manualBoxes.length > 0) {
       manualBoxes.pop();
       renderAllMasks();
-    } else if (aiBoxes.length > 0) {
-      aiBoxes.pop();
+    } else if (rawAiBoxes.length > 0) {
+      rawAiBoxes.pop();
       renderAllMasks();
     }
   });
 
-  // Process with AI
+  // AI Processing Call
   document.getElementById("processBtn").addEventListener("click", async () => {
     const key = keyInput.value.trim();
     const scope = document.getElementById("sanitizationScope").value;
@@ -285,19 +307,21 @@
 
     const btn = document.getElementById("processBtn");
     btn.disabled = true;
-    btn.innerText = "Scanning Dual-Logos & Claims...";
+    btn.innerText = "Scanning Trademarks & Lockups...";
 
     try {
       const detectPrompt = `
       Analyze this product packaging for affiliate deal posting compliance.
 
       TASK 1: CO-BRAND & TRADEMARK DETECTION (CRITICAL)
-      Detect ALL registered trademarks, brand names, sub-brands, partner ingredients, and claims on the entire packaging.
-      Many products have DUAL or CO-BRANDED logos (e.g. "Arm & Hammer" AND "OxiClean", "Tide" AND "Downy/Febreze", "Lysol" AND "Air Wick").
-      You MUST return bounding boxes for:
-      - Primary header brand logo/emblem (e.g., Arm & Hammer)
-      - Secondary co-brands, ingredient brand partner logos, or sub-brand badges (e.g., "OxiClean", "Febreze", "Downy", "Clorox")
-      - Health, sanitizer, or pesticide claims ('AIR SANITIZER', 'SANITIZER', 'DISINFECTANT', 'ANTIBACTERIAL', 'KILLING 99.9%', 'VIRUSES', 'BACTERIA', 'SCIENTIFICALLY PROVEN').
+      Detect ALL registered trademarks, logos, brand emblems, and proprietary taglines across the packaging.
+      IMPORTANT: Detect complete co-branded clusters. For example:
+      - Primary manufacturer logo/emblem (e.g., Arm & Hammer)
+      - Secondary co-brands and ingredient partner logos (e.g., OxiClean, Febreze, Downy, Clorox)
+      - Trademarked taglines, descriptors, and adjacent modifiers like 'plus', 'stain fighters', 'ODOR BLASTERS', 'ultra', and 'microban'
+      - Sanitizer/medical claims ('AIR SANITIZER', 'SANITIZER', 'DISINFECTANT', 'ANTIBACTERIAL', 'KILLING 99.9%', 'VIRUSES', 'BACTERIA', 'SCIENTIFICALLY PROVEN').
+      
+      CRITICAL INSTRUCTION: Return GENEROUS coordinates that encompass entire graphic clusters (including words like 'plus' and 'ODOR BLASTERS') so text edges are never cut off.
       Return normalized coordinates [ymin, xmin, ymax, xmax] (0 to 1000 integers).
 
       TASK 2: SUGGESTED COMPLIANT TITLE
@@ -329,7 +353,7 @@
       rawText = rawText.replace(/```json/g, "").replace(/```/g, "").trim();
       let parsed = JSON.parse(rawText);
 
-      aiBoxes = Array.isArray(parsed) ? parsed : (parsed.boxes || []);
+      rawAiBoxes = Array.isArray(parsed) ? parsed : (parsed.boxes || []);
       renderAllMasks();
 
       // Render Suggested Title
@@ -343,7 +367,7 @@
       list.innerHTML = "";
 
       const defaultTip = document.createElement("li");
-      defaultTip.innerHTML = `<b>Co-Brand Notice:</b> Watch out for ingredient partners (like <i>OxiClean</i> or <i>Febreze</i>). Both must be masked.`;
+      defaultTip.innerHTML = `<b>Cluster Masking Active:</b> Adjacent trademarks (like <i>Arm & Hammer</i> + <i>OxiClean Odor Blasters</i>) are merged with expanded margins to prevent edge leakage.`;
       list.appendChild(defaultTip);
 
       if (parsed.suggestions && Array.isArray(parsed.suggestions)) {
@@ -365,7 +389,58 @@
     }
   });
 
-  // Render Pipeline
+  // Algorithm 1: Expand Bounding Box by Margin (Padding)
+  function expandBox(box, paddingRatio) {
+    const [ymin, xmin, ymax, xmax] = box;
+    const w = xmax - xmin;
+    const h = ymax - ymin;
+    const padX = w * paddingRatio;
+    const padY = h * paddingRatio;
+
+    return [
+      Math.max(0, Math.round(ymin - padY)),
+      Math.max(0, Math.round(xmin - padX)),
+      Math.min(1000, Math.round(ymax + padY)),
+      Math.min(1000, Math.round(xmax + padX))
+    ];
+  }
+
+  // Algorithm 2: Merge Overlapping or Closely Stacked Boxes into a Single Unbroken Region
+  function mergeCloseBoxes(boxes, thresholdX = 40, thresholdY = 60) {
+    if (boxes.length <= 1) return boxes;
+    let merged = boxes.map(b => [...b]);
+    let changed = true;
+
+    while (changed) {
+      changed = false;
+      for (let i = 0; i < merged.length; i++) {
+        for (let j = i + 1; j < merged.length; j++) {
+          const [y1_min, x1_min, y1_max, x1_max] = merged[i];
+          const [y2_min, x2_min, y2_max, x2_max] = merged[j];
+
+          // Check if boxes overlap or are within proximity thresholds
+          const overlapX = !(x1_max + thresholdX < x2_min || x2_max + thresholdX < x1_min);
+          const overlapY = !(y1_max + thresholdY < y2_min || y2_max + thresholdY < y1_min);
+
+          if (overlapX && overlapY) {
+            merged[i] = [
+              Math.min(y1_min, y2_min),
+              Math.min(x1_min, x2_min),
+              Math.max(y1_max, y2_max),
+              Math.max(x1_max, x2_max)
+            ];
+            merged.splice(j, 1);
+            changed = true;
+            break;
+          }
+        }
+        if (changed) break;
+      }
+    }
+    return merged;
+  }
+
+  // Render Pipeline: Applies Padding & Merging Dynamically
   function renderAllMasks() {
     if (!loadedImage) return;
 
@@ -373,7 +448,19 @@
     ctx.drawImage(loadedImage, 0, 0);
 
     const mode = document.getElementById("maskMode").value;
-    const allBoxes = [...aiBoxes, ...manualBoxes];
+    const paddingRatio = parseFloat(document.getElementById("paddingSelect").value);
+    const shouldMerge = document.getElementById("mergeSelect").value === "true";
+
+    // 1. Expand AI boxes by padding ratio
+    let processedBoxes = rawAiBoxes.map(b => expandBox(b, paddingRatio));
+
+    // 2. Merge vertically/horizontally close boxes into solid unified blocks
+    if (shouldMerge) {
+      processedBoxes = mergeCloseBoxes(processedBoxes, 40, 60);
+    }
+
+    // Combine with user-drawn manual boxes
+    const allBoxes = [...processedBoxes, ...manualBoxes];
 
     allBoxes.forEach(box => {
       const [ymin, xmin, ymax, xmax] = box;
