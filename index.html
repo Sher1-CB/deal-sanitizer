@@ -4,7 +4,26 @@
   <meta charset="UTF-8">
   <title>Deal Sanitizer & Auto-Masker</title>
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f172a; color: #f8fafc; padding: 2rem; }
+    body { 
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+      background: #0f172a; 
+      color: #f8fafc; 
+      padding: 2.5rem 2rem 2rem; 
+      position: relative;
+    }
+    
+    /* Top-Right Version Indicator */
+    .app-version {
+      position: absolute;
+      top: 1rem;
+      right: 1.5rem;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.75rem;
+      color: #64748b;
+      letter-spacing: 0.05em;
+      user-select: none;
+    }
+
     .container { max-width: 900px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; }
     .card { background: #1e293b; padding: 1.5rem; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.5); }
     .full-width { grid-column: span 2; }
@@ -18,11 +37,22 @@
 </head>
 <body>
 
+<!-- Top Right Version Badge -->
+<div class="app-version">v1.0.02</div>
+
 <div class="container">
   <div class="card full-width">
     <h2>Automated Deal Asset Sanitizer</h2>
+    
     <label>Gemini API Key</label>
     <input type="password" id="apiKey" placeholder="AIzaSy...">
+
+    <label>Gemini Model</label>
+    <select id="modelSelect">
+      <option value="gemini-2.5-flash" selected>gemini-2.5-flash (Recommended)</option>
+      <option value="gemini-2.0-flash">gemini-2.0-flash</option>
+      <option value="gemini-1.5-flash-latest">gemini-1.5-flash-latest</option>
+    </select>
   </div>
 
   <!-- Left: Inputs -->
@@ -85,10 +115,54 @@
     reader.readAsDataURL(file);
   });
 
+  // Safe API caller with automatic fallback chain
+  async function callGeminiWithFallback(key, body, initialModel) {
+    const candidateModels = [
+      initialModel,
+      "gemini-2.5-flash",
+      "gemini-2.0-flash",
+      "gemini-1.5-flash-latest"
+    ].filter((v, i, a) => v && a.indexOf(v) === i);
+
+    let lastError = null;
+
+    for (const model of candidateModels) {
+      try {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body)
+        });
+
+        const data = await response.json();
+
+        if (!response.ok || data.error) {
+          // If model is not found, try the next model
+          if (data.error?.code === 404 || data.error?.message?.includes("not found")) {
+            lastError = new Error(data.error.message);
+            continue;
+          }
+          throw new Error(data.error?.message || `HTTP ${response.status}`);
+        }
+
+        return data; // Successful call
+      } catch (err) {
+        if (err.message && err.message.includes("not found")) {
+          lastError = err;
+          continue;
+        }
+        throw err;
+      }
+    }
+
+    throw lastError || new Error("All available Gemini models failed.");
+  }
+
   document.getElementById("processBtn").addEventListener("click", async () => {
     const key = document.getElementById("apiKey").value.trim();
     const rawCopy = document.getElementById("rawCopy").value.trim();
     const mode = document.getElementById("maskMode").value;
+    const selectedModel = document.getElementById("modelSelect").value;
 
     if (!key) {
       alert("Please enter your Gemini API Key.");
@@ -104,31 +178,20 @@
     btn.innerText = "Analyzing & Masking...";
 
     try {
-      // 1. Call Gemini to detect coordinates
+      // 1. Detect coordinates with automatic fallback
       const detectPrompt = "Detect all brand logos, trademarks, and manufacturer brand text in this image. Return a JSON object with a single key 'boxes' containing an array of normalized coordinates [ymin, xmin, ymax, xmax] (0 to 1000).";
 
-      const detectResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{
-            parts: [
-              { text: detectPrompt },
-              { inline_data: { mime_type: imageMimeType, data: base64Image } }
-            ]
-          }]
-        })
-      });
-
-      const detectData = await detectResponse.json();
-
-      // Catch Google API errors directly
-      if (!detectResponse.ok || detectData.error) {
-        throw new Error(detectData.error?.message || `API Error: HTTP ${detectResponse.status}`);
-      }
+      const detectData = await callGeminiWithFallback(key, {
+        contents: [{
+          parts: [
+            { text: detectPrompt },
+            { inline_data: { mime_type: imageMimeType, data: base64Image } }
+          ]
+        }]
+      }, selectedModel);
 
       if (!detectData.candidates || detectData.candidates.length === 0) {
-        throw new Error("No response candidates returned by Google (possible safety block).");
+        throw new Error("No response candidates returned by Google (safety filter trigger).");
       }
 
       // 2. Parse coordinates safely
@@ -142,7 +205,7 @@
         alert("No prominent brand logos detected in this image.");
       }
 
-      // 3. Apply selected mask effect
+      // 3. Apply mask
       boxes.forEach(box => {
         const [ymin, xmin, ymax, xmax] = box;
         const x = (xmin / 1000) * canvas.width;
@@ -163,13 +226,10 @@
       if (rawCopy) {
         const copyPrompt = `Analyze this product description: "${rawCopy}". Rewrite it into a 2-sentence social deal post. STRICT RULES: 1) Never mention the brand name, parent company, or trademarked characters. 2) Replace any health or medical claim words ('disinfect', 'disinfecting', 'sanitizer', 'antibacterial') with generic equivalents ('cleaning', 'surface wipes', 'refresher'). 3) Do not include raw dollar amounts.`;
 
-        const copyResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ contents: [{ parts: [{ text: copyPrompt }] }] })
-        });
+        const copyData = await callGeminiWithFallback(key, {
+          contents: [{ parts: [{ text: copyPrompt }] }]
+        }, selectedModel);
 
-        const copyData = await copyResponse.json();
         if (copyData.candidates && copyData.candidates[0]?.content?.parts[0]?.text) {
           document.getElementById("cleanCopy").value = copyData.candidates[0].content.parts[0].text.trim();
           document.getElementById("copyTextBtn").style.display = "block";
@@ -219,7 +279,7 @@
     ctx.restore();
   }
 
-  // Export & Copy Helpers
+  // Helpers
   document.getElementById("downloadBtn").addEventListener("click", () => {
     const link = document.createElement("a");
     link.download = "sanitized-deal.png";
