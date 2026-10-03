@@ -32,7 +32,7 @@
     <input type="file" id="imageInput" accept="image/*">
 
     <label>Original Product Title & Details</label>
-    <textarea id="rawCopy" rows="4" placeholder="e.g., Clorox Disinfecting Wipes 3-Pack 75ct Lemon Scent, Original Retail $14.99"></textarea>
+    <textarea id="rawCopy" rows="4" placeholder="e.g., Clorox Wipes 3-Pack Lemon Scent, Original Retail $14.99"></textarea>
 
     <label>Masking Mode</label>
     <select id="maskMode">
@@ -61,14 +61,16 @@
 
 <script>
   let base64Image = "";
+  let imageMimeType = "image/jpeg";
   const canvas = document.getElementById("outputCanvas");
   const ctx = canvas.getContext("2d");
 
-  // Load image to memory and initial render
+  // Load and preview image
   document.getElementById("imageInput").addEventListener("change", function(e) {
     const file = e.target.files[0];
     if (!file) return;
 
+    imageMimeType = file.type || "image/jpeg";
     const reader = new FileReader();
     reader.onload = function(evt) {
       base64Image = evt.target.result.split(",")[1];
@@ -88,8 +90,12 @@
     const rawCopy = document.getElementById("rawCopy").value.trim();
     const mode = document.getElementById("maskMode").value;
 
-    if (!key || !base64Image) {
-      alert("Please provide an API Key and select an image.");
+    if (!key) {
+      alert("Please enter your Gemini API Key.");
+      return;
+    }
+    if (!base64Image) {
+      alert("Please select an image first.");
       return;
     }
 
@@ -98,9 +104,9 @@
     btn.innerText = "Analyzing & Masking...";
 
     try {
-      // 1. Get Bounding Boxes from Gemini
-      const detectPrompt = "Locate all brand logos, manufacturer names, and trademark graphics. Return a valid JSON array of coordinate objects with key 'boxes': [[ymin, xmin, ymax, xmax]], where coordinates are normalized 0-1000 integers. Do not include markdown codeblocks.";
-      
+      // 1. Call Gemini to detect coordinates
+      const detectPrompt = "Detect all brand logos, trademarks, and manufacturer brand text in this image. Return a JSON object with a single key 'boxes' containing an array of normalized coordinates [ymin, xmin, ymax, xmax] (0 to 1000).";
+
       const detectResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -108,18 +114,35 @@
           contents: [{
             parts: [
               { text: detectPrompt },
-              { inline_data: { mime_type: "image/jpeg", data: base64Image } }
+              { inline_data: { mime_type: imageMimeType, data: base64Image } }
             ]
-          }],
-          generationConfig: { response_mime_type: "application/json" }
+          }]
         })
       });
 
       const detectData = await detectResponse.json();
-      const parsedBoxes = JSON.parse(detectData.candidates[0].content.parts[0].text);
-      const boxes = parsedBoxes.boxes || parsedBoxes;
 
-      // 2. Apply Masking to Canvas
+      // Catch Google API errors directly
+      if (!detectResponse.ok || detectData.error) {
+        throw new Error(detectData.error?.message || `API Error: HTTP ${detectResponse.status}`);
+      }
+
+      if (!detectData.candidates || detectData.candidates.length === 0) {
+        throw new Error("No response candidates returned by Google (possible safety block).");
+      }
+
+      // 2. Parse coordinates safely
+      let rawText = detectData.candidates[0].content.parts[0].text;
+      rawText = rawText.replace(/```json/g, "").replace(/```/g, "").trim();
+      
+      let parsed = JSON.parse(rawText);
+      let boxes = Array.isArray(parsed) ? parsed : (parsed.boxes || []);
+
+      if (boxes.length === 0) {
+        alert("No prominent brand logos detected in this image.");
+      }
+
+      // 3. Apply selected mask effect
       boxes.forEach(box => {
         const [ymin, xmin, ymax, xmax] = box;
         const x = (xmin / 1000) * canvas.width;
@@ -136,9 +159,9 @@
         }
       });
 
-      // 3. Generate Sanitized Copy
+      // 4. Generate clean post copy
       if (rawCopy) {
-        const copyPrompt = `Analyze this deal description: "${rawCopy}". Rewrite it into a 2-sentence deal post. STRICT RULES: 1) Never mention the brand name, parent company, or trademarked characters. 2) Replace any health or medical claim words ('disinfect', 'sanitizer', 'antibacterial') with generic equivalents ('cleaning', 'surface wipes'). 3) Do not include raw dollar amounts.`;
+        const copyPrompt = `Analyze this product description: "${rawCopy}". Rewrite it into a 2-sentence social deal post. STRICT RULES: 1) Never mention the brand name, parent company, or trademarked characters. 2) Replace any health or medical claim words ('disinfect', 'disinfecting', 'sanitizer', 'antibacterial') with generic equivalents ('cleaning', 'surface wipes', 'refresher'). 3) Do not include raw dollar amounts.`;
 
         const copyResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`, {
           method: "POST",
@@ -147,8 +170,10 @@
         });
 
         const copyData = await copyResponse.json();
-        document.getElementById("cleanCopy").value = copyData.candidates[0].content.parts[0].text.trim();
-        document.getElementById("copyTextBtn").style.display = "block";
+        if (copyData.candidates && copyData.candidates[0]?.content?.parts[0]?.text) {
+          document.getElementById("cleanCopy").value = copyData.candidates[0].content.parts[0].text.trim();
+          document.getElementById("copyTextBtn").style.display = "block";
+        }
       }
 
       document.getElementById("downloadBtn").style.display = "block";
@@ -161,40 +186,40 @@
     }
   });
 
-  // Canvas Masking Effects
+  // Canvas Masking Functions
   function applyRibbonBadge(x, y, w, h) {
     ctx.save();
     ctx.fillStyle = "#ef4444";
-    ctx.fillRect(x - 5, y - 5, w + 10, h + 10);
+    ctx.fillRect(x - 4, y - 4, w + 8, h + 8);
     ctx.fillStyle = "#ffffff";
-    ctx.font = `bold ${Math.max(14, Math.floor(h * 0.45))}px sans-serif`;
+    ctx.font = `bold ${Math.max(12, Math.floor(h * 0.4))}px sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText("DEAL DROP", x + w / 2, y + h / 2);
+    ctx.fillText("SPECIAL DEAL", x + w / 2, y + h / 2);
     ctx.restore();
   }
 
   function applyPixelation(x, y, w, h) {
-    const size = 0.08;
-    const offCanvas = document.createElement("canvas");
-    offCanvas.width = Math.max(1, w * size);
-    offCanvas.height = Math.max(1, h * size);
-    const offCtx = offCanvas.getContext("2d");
+    const scale = 0.08;
+    const off = document.createElement("canvas");
+    off.width = Math.max(1, w * scale);
+    off.height = Math.max(1, h * scale);
+    const offCtx = off.getContext("2d");
 
-    offCtx.drawImage(canvas, x, y, w, h, 0, 0, offCanvas.width, offCanvas.height);
+    offCtx.drawImage(canvas, x, y, w, h, 0, 0, off.width, off.height);
     ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(offCanvas, 0, 0, offCanvas.width, offCanvas.height, x, y, w, h);
+    ctx.drawImage(off, 0, 0, off.width, off.height, x, y, w, h);
     ctx.imageSmoothingEnabled = true;
   }
 
   function applyBlur(x, y, w, h) {
     ctx.save();
-    ctx.filter = "blur(16px)";
+    ctx.filter = "blur(18px)";
     ctx.drawImage(canvas, x, y, w, h, x, y, w, h);
     ctx.restore();
   }
 
-  // Download Output
+  // Export & Copy Helpers
   document.getElementById("downloadBtn").addEventListener("click", () => {
     const link = document.createElement("a");
     link.download = "sanitized-deal.png";
@@ -202,10 +227,9 @@
     link.click();
   });
 
-  // Copy text helper
   document.getElementById("copyTextBtn").addEventListener("click", () => {
     navigator.clipboard.writeText(document.getElementById("cleanCopy").value);
-    alert("Copy copied to clipboard!");
+    alert("Caption copied to clipboard!");
   });
 </script>
 </body>
