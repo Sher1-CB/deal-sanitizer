@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Deal Sanitizer & Auto-Masker v1.2.20</title>
+  <title>Deal Sanitizer & Auto-Masker v1.2.21</title>
   <style>
     body { 
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
@@ -98,13 +98,13 @@
 </head>
 <body>
 
-<div class="app-version-fixed">v1.2.20</div>
+<div class="app-version-fixed">v1.2.21</div>
 
 <div class="container">
   <div class="card full-width">
     <h2>
       Automated Deal Asset Sanitizer 
-      <span class="version-header-badge">v1.2.20</span>
+      <span class="version-header-badge">v1.2.21</span>
     </h2>
     
     <label>Gemini API Key</label>
@@ -216,14 +216,14 @@
   const savedKey = localStorage.getItem("deal_gemini_key");
   if (savedKey) keyInput.value = savedKey;
 
-  // DYNAMIC MODEL SELECTION: 100% dynamic, queries live API, groups by version, locks onto 3rd-latest fast tier
+  // DYNAMIC MODEL SELECTION: Prioritizes true LITE tier models for maximum quota (1500 RPD vs 20 RPD)
   async function autoDetectAndSelectModel(key) {
     if (!key) return;
     const select = document.getElementById("modelSelect");
     const label = document.getElementById("modelSelectLabel");
 
     try {
-      label.textContent = "Gemini Model (Detecting live model generations...)";
+      label.textContent = "Gemini Model (Detecting high-quota Lite models...)";
       const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`);
       const data = await res.json();
       if (!data.models || !Array.isArray(data.models)) {
@@ -231,20 +231,27 @@
         return;
       }
 
-      // Filter to generation-capable fast models, excluding non-generative endpoints
-      const fastModels = data.models
+      // 1. Isolate generative multimodal models (filter out previews and non-generative endpoints)
+      const allGenModels = data.models
         .map(m => m.name.replace("models/", ""))
         .filter(name => {
           const lower = name.toLowerCase();
           return lower.includes("gemini") && 
-                 (lower.includes("flash") || lower.includes("lite")) &&
+                 !lower.includes("preview") &&
                  !lower.includes("embedding") &&
                  !lower.includes("aqa");
         });
 
-      // Extract numeric version keys (e.g. 3.7, 3.6, 3.1, 2.5, 2.0, 1.5)
+      // 2. Separate into TRUE LITE models vs standard models
+      const liteModels = allGenModels.filter(name => name.toLowerCase().includes("lite") || name.toLowerCase().includes("8b"));
+      const fallbackFlashModels = allGenModels.filter(name => name.toLowerCase().includes("flash"));
+
+      // Target Lite models pool first for maximum rate limits
+      const targetPool = liteModels.length > 0 ? liteModels : fallbackFlashModels;
+
+      // 3. Group by version generation
       const versionMap = {};
-      fastModels.forEach(name => {
+      targetPool.forEach(name => {
         const match = name.match(/gemini-(\d+(?:\.\d+)?)/i);
         if (match) {
           const ver = parseFloat(match[1]);
@@ -253,36 +260,28 @@
         }
       });
 
-      // Sort unique version numbers descending (newest first)
-      const sortedGenerations = Object.keys(versionMap)
+      const sortedVersions = Object.keys(versionMap)
         .map(Number)
         .sort((a, b) => b - a);
 
-      // Select the 3rd-to-latest generation
-      let targetGenIndex = 0;
-      if (sortedGenerations.length >= 3) {
-        targetGenIndex = 2; // 3rd to latest
-      } else if (sortedGenerations.length === 2) {
-        targetGenIndex = 1; // 2nd to latest
+      // 4. Select the 2nd or 3rd generation of Lite models (e.g. 2.5-flash-lite or 2.0-flash-lite)
+      let selectedVersion = sortedVersions[0];
+      if (sortedVersions.length >= 2) {
+        selectedVersion = sortedVersions[1]; // 2nd-to-latest Lite generation
       }
 
-      const targetVersion = sortedGenerations[targetGenIndex];
-      const targetFamily = versionMap[targetVersion] || fastModels;
-
-      // Prefer Lite if available in that target generation, then Flash
-      let autoSelectedModel = targetFamily.find(m => m.toLowerCase().includes("lite")) 
-        || targetFamily.find(m => m.toLowerCase().includes("flash")) 
-        || targetFamily[0];
+      const candidateGroup = versionMap[selectedVersion] || targetPool;
+      let autoSelectedModel = candidateGroup[0] || "gemini-2.5-flash-lite";
 
       select.innerHTML = "";
       
       const optAuto = document.createElement("option");
       optAuto.value = autoSelectedModel;
-      optAuto.textContent = `${autoSelectedModel} (Auto-Selected: 3rd-Gen Fast)`;
+      optAuto.textContent = `${autoSelectedModel} (High Quota Lite Tier)`;
       optAuto.selected = true;
       select.appendChild(optAuto);
 
-      fastModels
+      allGenModels
         .filter(m => m !== autoSelectedModel)
         .forEach(m => {
           const opt = document.createElement("option");
