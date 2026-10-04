@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Deal Sanitizer & Auto-Masker v1.0.13</title>
+  <title>Deal Sanitizer & Auto-Masker v1.0.15</title>
   <style>
     body { 
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
@@ -98,13 +98,13 @@
 </head>
 <body>
 
-<div class="app-version-fixed">v1.0.13</div>
+<div class="app-version-fixed">v1.0.15</div>
 
 <div class="container">
   <div class="card full-width">
     <h2>
       Automated Deal Asset Sanitizer 
-      <span class="version-header-badge">v1.0.13</span>
+      <span class="version-header-badge">v1.0.15</span>
     </h2>
     
     <label>Gemini API Key</label>
@@ -224,18 +224,15 @@
     localStorage.setItem("deal_gemini_key", keyInput.value.trim());
   });
 
-  // Strict Programmatic Title Sanitizer
   function enforceSafeTitle(rawTitle) {
     if (!rawTitle) return "";
     let safe = rawTitle;
     const rules = [
-      // Scent trademarks (Clean replacements)
       [/\bfresh\s+burst\b/gi, "Fresh Scent"],
       [/\bclean\s+breeze\b/gi, "Fresh Scent"],
       [/\bmountain\s+spring\b/gi, "Fresh Scent"],
       [/\bmeadow\s+fresh\b/gi, "Fresh Scent"],
       [/\boriginal\s+fresh\b/gi, "Fresh Scent"],
-      // Functional regulated claims
       [/\b(laundry\s+)?sanitizer\b/gi, "Fabric Refresher"],
       [/\bhand\s+sanitizer\b/gi, "Hand Cleanser"],
       [/\bsanitizer\b/gi, "Refresher"],
@@ -243,7 +240,6 @@
       [/\bdisinfecting\b/gi, "Deep Cleaning"],
       [/\bantibacterial\b/gi, "Odor-Fighting"],
       [/\bkills\s+99\.9%(?:\s+of\s+germs)?\b/gi, "Total Clean"],
-      // Brand names
       [/\bclorox\b/gi, ""],
       [/\blysol\b/gi, ""],
       [/\barm\s*&\s*hammer\b/gi, ""],
@@ -324,36 +320,37 @@
 
     const btn = document.getElementById("processBtn");
     btn.disabled = true;
-    btn.innerText = "Scanning & Calculating Padding...";
+    btn.innerText = "Scanning Packaging & Specs...";
 
     try {
       const detectPrompt = `
       Examine this product packaging for automated affiliate compliance.
 
-      TASK 1: COMPLETE VISUAL BOUNDING BOXES
-      Scan the ENTIRE packaging, including lower banners, central artwork, and badge perimeters.
+      TASK 1: COMPLETE VISUAL BOUNDING BOXES (WHAT TO MASK)
       Return normalized coordinates [ymin, xmin, ymax, xmax] (0 to 1000 integers) covering:
-      1. Primary brand logos, emblems, and circular crest rims (ensure boxes generously swallow words directly bordering the crest perimeter).
-      2. Secondary brand names and ingredient partner logos (e.g. 'OxiClean', 'CLOROX', 'Febreze').
-      3. Trademarked scent badges carrying ™ or ® (e.g., 'fresh burst™').
-      4. Health claims ('BACTERIA', 'VIRUSES', 'SANITIZER', 'DISINFECTANT', 'ODORS & BACTERIA', 'GERMS', 'KILLING 99.9%').
+      1. All primary brand logos, crests, starburst backgrounds, and colored backing shapes.
+      2. Secondary brand names, co-brands, and partner ingredients ('OxiClean', 'CLOROX', 'Febreze').
+      3. Trademarked slogans or scent lines carrying ™ or ® (e.g. 'Fresh Burst™').
+      4. Regulated medical/sanitation claims ('BACTERIA', 'VIRUSES', 'SANITIZER', 'DISINFECTANT', 'KILLING 99.9%').
+      5. Pathogen/virus visual illustrations (spiky balls).
+
+      CRITICAL WHITELIST (WHAT TO KEEP VISIBLE - DO NOT MASK):
+      - DO NOT mask bottle volume or size measurements (e.g., '90 FL OZ', '32 FL OZ', '946 mL').
+      - DO NOT mask pack count specifications (e.g., '3-PACK', '72 PAKS').
+      - DO NOT mask generic non-trademarked scent descriptions (e.g., 'Crisp Linen', 'Simple Fresh').
+      - DO NOT mask generic product photography (e.g., detergent pods, clothing, eucalyptus leaves).
 
       TASK 2: PACKAGING GEOMETRY & RECOMMENDED MARGIN
-      Evaluate packaging geometry. Select best margin from: [10, 12.5, 15, 17.5, 20].
-      - Use 10%–12.5% only for flat, plain rectangular surfaces.
-      - Use 15%–17.5% whenever circular crest logos, perimeter radial bursts, or curved bottle shoulders are present.
-      - Use 20% for heavily contoured surfaces or high-contrast outlines.
+      Evaluate packaging curvature. Select best margin from: [10, 12.5, 15, 17.5, 20].
+      - Use 15%–17.5% default for bottles with crest emblems or curved tapers.
+      - Use 20% for wide background starbursts or irregular logo contours.
 
       TASK 3: COMPLIANT GENERIC TITLE
-      Generate a brand-free, trademark-free title based on count/volume, scent, and form factor.
-      STRICT FORBIDDEN WORDS:
-      - Never use parent brand names ('Arm & Hammer', 'Clorox', 'Tide').
-      - Never use trademarked scent lines with ™ or ® (e.g., do NOT use 'Fresh Burst'). Instead, use generic 'Fresh Scent' or omit.
-      - Never use restricted functional terms ('Sanitizer', 'Disinfectant', 'Antibacterial').
-      Example: "72-Count 5-in-1 Laundry Detergent Power Paks - Fresh Scent"
+      Generate a brand-free, trademark-free title incorporating verified volume/count and generic scent.
+      Example: "90 fl oz Crisp Linen Laundry Fabric Refresher"
 
       TASK 4: POSTER SUGGESTIONS
-      Provide 2 brief tips for the affiliate poster.
+      Provide 2 brief tips confirming what was masked and verifying size/count retention.
 
       Return JSON:
       {
@@ -397,7 +394,7 @@
       list.innerHTML = "";
 
       const defaultTip = document.createElement("li");
-      defaultTip.innerHTML = `<b>Adaptive Geometry:</b> AI applied <b>${(aiRecommendedMargin * 100).toFixed(1)}%</b> margin padding based on packaging curvature.`;
+      defaultTip.innerHTML = `<b>Conversion Safeguard:</b> Package volume, count, and generic scent notes are preserved to maximize deal appeal.`;
       list.appendChild(defaultTip);
 
       if (parsed.suggestions && Array.isArray(parsed.suggestions)) {
