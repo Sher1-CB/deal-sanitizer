@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Deal Sanitizer & Auto-Masker v1.2.18</title>
+  <title>Deal Sanitizer & Auto-Masker v1.2.19</title>
   <style>
     body { 
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
@@ -98,13 +98,13 @@
 </head>
 <body>
 
-<div class="app-version-fixed">v1.2.18</div>
+<div class="app-version-fixed">v1.2.19</div>
 
 <div class="container">
   <div class="card full-width">
     <h2>
       Automated Deal Asset Sanitizer 
-      <span class="version-header-badge">v1.2.18</span>
+      <span class="version-header-badge">v1.2.19</span>
     </h2>
     
     <label>Gemini API Key</label>
@@ -438,13 +438,14 @@
          - Bottom Claim Strip: Return a dedicated wide horizontal strip covering the red 'Eliminates Odors by Killing 99.9%...' banner immediately above the '3-PACK' wrap.
 
       2. LIQUID JUGS & ASYMMETRICAL BOTTLES (e.g., Lysol, Clorox):
-         - Main Upper Label Mask:
-           * ymin: Anchor directly to the dark blue plastic neck collar (covering arched 'KILLS COLD & FLU' claims).
-           * ymax: MUST completely enclose the word 'SANITIZER'.
-           * Keep 'LAUNDRY' and 'CRISP LINEN SCENT' legible above/below.
-         - Dedicated Left Flank Badge Mask:
-           * The red starburst claim badge on the far-left outer edge ('KILLS 99.9%') MUST have its own independent box.
-           * Set xmin to 0 (hard left canvas border) so that every single red scalloped tooth is completely submerged.
+         - Upper Brand Mask:
+           * ymin: Directly at the dark blue plastic neck collar (to cover arched cold/flu text).
+           * ymax: Stop IMMEDIATELY beneath the diagonal brand name ('Lysol'). Do NOT extend down into the text block below.
+         - Category Descriptor Rule:
+           * Keep 'LAUNDRY' and 'CRISP LINEN SCENT' clean and visible.
+           * Return a small, dedicated horizontal strip ONLY over the single word 'SANITIZER'.
+         - Flank Badge:
+           * Set xmin to 0 so the red scalloped badge on the left edge is covered out to the border.
 
       3. POUCHES & BOXES (e.g., Arm & Hammer, Tide):
          - Mask top circular heritage emblems, middle co-brand clusters (e.g., 'plus OxiClean / ODOR BLASTERS'), and corner trademarked scent badges.
