@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Deal Sanitizer & Auto-Masker v1.2.23</title>
+  <title>Deal Sanitizer & Auto-Masker v1.2.24</title>
   <style>
     body { 
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
@@ -98,13 +98,13 @@
 </head>
 <body>
 
-<div class="app-version-fixed">v1.2.23</div>
+<div class="app-version-fixed">v1.2.24</div>
 
 <div class="container">
   <div class="card full-width">
     <h2>
       Automated Deal Asset Sanitizer 
-      <span class="version-header-badge">v1.2.23</span>
+      <span class="version-header-badge">v1.2.24</span>
     </h2>
     
     <label>Gemini API Key</label>
@@ -533,20 +533,18 @@
     const w = xmax - xmin;
     const h = ymax - ymin;
     
-    // Controlled padding ratio (prevents ballooning on large boxes)
-    const effectiveMargin = Math.min(0.12, marginRatio * 0.65);
-    const padX = Math.round(w * effectiveMargin);
-    const padY = Math.round(h * (effectiveMargin * 0.75));
+    const padX = Math.round(w * 0.12);
+    const padY = Math.round(h * 0.10);
 
     let newYmin = Math.max(0, ymin - padY);
     let newXmin = Math.max(0, xmin - padX);
     let newYmax = Math.min(1000, ymax + padY);
     let newXmax = Math.min(1000, xmax + padX);
 
-    // Perimeter Edge Snap: Catches flank crests and border claims
-    if (xmin <= 120) newXmin = 0;
-    if (xmax >= 880) newXmax = 1000;
-    if (ymin <= 60) newYmin = 0;
+    // Perimeter Edge Snap: Snaps side badges flush to canvas borders
+    if (xmin <= 130) newXmin = 0;
+    if (xmax >= 870) newXmax = 1000;
+    if (ymin <= 50) newYmin = 0;
 
     return [newYmin, newXmin, newYmax, newXmax];
   }
@@ -638,15 +636,15 @@
     document.getElementById("downloadBtn").style.display = "inline-block";
   }
 
-  // Scale-Invariant Radial Diffusion with Uniform Cluster Color Tinting
+  // Scale-Invariant Radial Diffusion with High Opacity & Clamped Feathering
   function applyFrostedDiffusion(x, y, w, h, isBorderSnapped = false) {
     if (w <= 0 || h <= 0) return;
     const rw = Math.max(1, Math.round(w));
     const rh = Math.max(1, Math.round(h));
 
     const scaleFactor = getPackagingScale();
-    const dynamicBlur = Math.max(28, Math.round(36 * scaleFactor));
-    const pad = Math.round(dynamicBlur * 1.25);
+    const dynamicBlur = Math.max(24, Math.round(32 * scaleFactor));
+    const pad = Math.round(dynamicBlur * 1.2);
 
     const srcX = Math.max(0, x - pad);
     const srcY = Math.max(0, y - pad);
@@ -658,17 +656,15 @@
     off.height = srcH;
     const offCtx = off.getContext("2d");
 
-    // Sample upper-mid packaging region to avoid picking up dark graphic swooshes or shadows
+    // Sample dominant tone from top 30% of box
     const sampleCanvas = document.createElement("canvas");
     sampleCanvas.width = 1;
     sampleCanvas.height = 1;
     const sCtx = sampleCanvas.getContext("2d");
-    
-    // Sample from top 35% of the box where packaging base color is cleanest
-    sCtx.drawImage(loadedImage, x, y, rw, Math.max(2, Math.round(rh * 0.35)), 0, 0, 1, 1);
+    sCtx.drawImage(loadedImage, x, y, rw, Math.max(2, Math.round(rh * 0.30)), 0, 0, 1, 1);
     let [r, g, b] = sCtx.getImageData(0, 0, 1, 1).data;
 
-    // Prevent oversaturated dark patches: if luminance is too low, lift to packaging ambient
+    // Prevent dark shadow discoloration
     const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
     if (luminance < 75) {
       r = Math.min(240, r + 60);
@@ -676,7 +672,7 @@
       b = Math.min(240, b + 60);
     }
 
-    // Scramble character typography vectors
+    // Scramble typography vectors
     const scale = 0.02;
     const mini = document.createElement("canvas");
     mini.width = Math.max(2, Math.floor(srcW * scale));
@@ -688,11 +684,11 @@
     offCtx.drawImage(mini, 0, 0, mini.width, mini.height, 0, 0, srcW, srcH);
     offCtx.imageSmoothingEnabled = true;
 
-    // Tone match with dominant background
-    offCtx.fillStyle = `rgba(${r}, ${g}, ${b}, 0.52)`;
+    // High-density underlay (0.88 opacity) to prevent white typography bleed
+    offCtx.fillStyle = `rgba(${r}, ${g}, ${b}, 0.88)`;
     offCtx.fillRect(0, 0, srcW, srcH);
 
-    // Deep Gaussian diffusion
+    // Diffusion layer
     const blurCanvas = document.createElement("canvas");
     blurCanvas.width = srcW;
     blurCanvas.height = srcH;
@@ -703,30 +699,33 @@
     const offsetX = x - srcX;
     const offsetY = y - srcY;
 
-    // Composite with soft perimeter feathering
     const patchCanvas = document.createElement("canvas");
     patchCanvas.width = rw;
     patchCanvas.height = rh;
     const pCtx = patchCanvas.getContext("2d");
     pCtx.drawImage(blurCanvas, offsetX, offsetY, rw, rh, 0, 0, rw, rh);
 
+    // Alpha Masking with Clamped Feathering
     const maskCanvas = document.createElement("canvas");
     maskCanvas.width = rw;
     maskCanvas.height = rh;
     const mCtx = maskCanvas.getContext("2d");
 
-    const feather = Math.max(6, Math.round(Math.min(rw, rh) * 0.10));
+    // Prevent small boxes (rh < 40) from dissolving entirely
+    const maxFeather = Math.min(rw, rh) < 40 ? 2 : 8;
+    const feather = Math.max(1, Math.min(maxFeather, Math.round(Math.min(rw, rh) * 0.08)));
+
     mCtx.fillStyle = "#ffffff";
-    
-    // If snapped flush to canvas border, draw straight to edge with zero falloff so flank badges never leak
     if (isBorderSnapped) {
       mCtx.fillRect(0, 0, rw - feather, rh);
     } else {
-      mCtx.fillRect(feather, feather, rw - feather * 2, rh - feather * 2);
+      mCtx.fillRect(feather, feather, Math.max(1, rw - feather * 2), Math.max(1, rh - feather * 2));
     }
     
-    mCtx.filter = `blur(${feather}px)`;
-    mCtx.drawImage(maskCanvas, 0, 0);
+    if (feather > 1) {
+      mCtx.filter = `blur(${feather}px)`;
+      mCtx.drawImage(maskCanvas, 0, 0);
+    }
 
     pCtx.globalCompositeOperation = "destination-in";
     pCtx.drawImage(maskCanvas, 0, 0);
