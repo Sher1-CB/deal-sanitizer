@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Deal Sanitizer & Auto-Masker v1.0.23</title>
+  <title>Deal Sanitizer & Auto-Masker v1.0.24</title>
   <style>
     body { 
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
@@ -98,13 +98,13 @@
 </head>
 <body>
 
-<div class="app-version-fixed">v1.0.23</div>
+<div class="app-version-fixed">v1.0.24</div>
 
 <div class="container">
   <div class="card full-width">
     <h2>
       Automated Deal Asset Sanitizer 
-      <span class="version-header-badge">v1.0.23</span>
+      <span class="version-header-badge">v1.0.24</span>
     </h2>
     
     <label>Gemini API Key</label>
@@ -134,7 +134,8 @@
 
     <label>Masking Visual Style</label>
     <select id="maskMode">
-      <option value="blur" selected>Zero-Leak Frosted Blur (4x4 Gradient Block)</option>
+      <option value="diffusion" selected>Dynamic Frosted Diffusion (Best for Sunbursts/Gradients)</option>
+      <option value="ambient">Ambient Gradient Block (4x4 Solid Bottles)</option>
       <option value="pixelate">Mosaic Pixelation</option>
       <option value="solid">Clean Dark Tape</option>
     </select>
@@ -251,7 +252,6 @@
       safe = safe.replace(regex, replacement);
     });
 
-    // Ensure Laundry Detergent descriptor is preserved for pod packaging
     if (/power\s+paks/i.test(safe) && !/laundry\s+detergent/i.test(safe)) {
       safe = safe.replace(/(?:5\s+in\s+1\s+)?power\s+paks/i, "5-in-1 Laundry Detergent Power Paks");
     }
@@ -338,12 +338,13 @@
       TASK 1: COMPLETE VISUAL BOUNDING BOXES (DETERMINISTIC ANCHORS)
       Scan the ENTIRE packaging surface. Return normalized coordinates [ymin, xmin, ymax, xmax] (0 to 1000 integers) covering:
       
-      1. AEROSOL SPRAY CANS & BOTTLE CLUSTERS (CRITICAL BOUNDARY ENFORCEMENT):
-         - For aerosol spray cans (e.g., Lysol Air Sanitizer): The mask box MUST cover the entire upper and middle label continuously. Set the top of the box right under the white shoulder/cap and extend the bottom edge ALL THE WAY DOWN to the top of the dark blue base banner, completely covering the brand crest, the word 'SANITIZER', and any red claim strips ('Eliminates Odors by Killing 99.9%'). Do NOT stop above the word 'SANITIZER'.
+      1. AEROSOL SPRAY CANS & BOTTLE CLUSTERS:
+         - For aerosol spray cans: Bounding box for EACH can MUST start directly below white cap rim and extend DOWNWARD all the way to the top border of the blue bottom base packaging.
+         - Must completely enclose brand crest, 'SANITIZER', and red claim strips ('Eliminates Odors by Killing 99.9%').
       
       2. POUCH CO-BRAND BANNERS & CORNER BADGES:
-         - For co-branded clusters (e.g., 'OxiClean' + 'ODOR BLASTERS'): Cover the logo and slanted tagline 'ODOR BLASTERS' tightly without expanding into the far right packaging seam.
-         - Corner scent badges: Always return a separate bounding box for scent badges marked with ™ or ® (e.g., 'fresh burst™').
+         - For middle co-brand clusters (e.g., 'plus OxiClean' + 'ODOR BLASTERS'): Cover the logo and slanted tagline 'ODOR BLASTERS' as a single cohesive horizontal line without ballooning into the far right packaging seam.
+         - Corner scent badges: Return a separate box for scent badges marked with ™ or ® (e.g., 'fresh burst™').
       
       3. PRIMARY BRAND MARKS & MASCOTS:
          - Mask primary brand typography and mascot silhouettes ('aussie', kangaroo silhouette, 'Arm & Hammer' circle crest, 'Clorox').
@@ -359,9 +360,8 @@
 
       TASK 3: COMPLIANT GENERIC TITLE (MANDATORY STRUCTURE)
       Format: [Count/Volume] + [Generic Product Category] + [Key Safe Features] + [Generic Scent if applicable].
-      RULE: You MUST include the generic product category (e.g., 'Laundry Detergent', 'Fabric Refresher', 'Household Cleaner', 'Hair Care Set'). Never drop the product category name.
+      RULE: You MUST include the generic product category (e.g., 'Laundry Detergent', 'Fabric Refresher', 'Household Cleaner', 'Hair Care Set').
       Example: "72-Count 5-in-1 Laundry Detergent Power Paks - Fresh Scent"
-      Example: "3-Pack 10 Fl. Oz Each Air Fabric Refresher Spray - Simple Fresh Scent"
 
       TASK 4: POSTER SUGGESTIONS
       Provide 2 brief tips confirming what was masked and verifying size/count retention.
@@ -411,7 +411,7 @@
       list.innerHTML = "";
 
       const defaultTip = document.createElement("li");
-      defaultTip.innerHTML = `<b>Category Retention Active:</b> Generic category names (e.g., 'Laundry Detergent') are preserved for conversion.`;
+      defaultTip.innerHTML = `<b>Horizontal Auto-Union:</b> Adjacent text fragments on the same line are merged to eliminate patchwork boxes.`;
       list.appendChild(defaultTip);
 
       if (parsed.suggestions && Array.isArray(parsed.suggestions)) {
@@ -433,7 +433,7 @@
     }
   });
 
-  // Margin Expansion with Strict 38% Horizontal Clamping
+  // Clamp width to prevent horizontal runaway
   function expandBox(box, paddingRatio) {
     const [ymin, xmin, ymax, xmax] = box;
     const w = xmax - xmin;
@@ -444,9 +444,8 @@
     let newXmin = Math.max(0, Math.round(xmin - padX));
     let newXmax = Math.min(1000, Math.round(xmax + padX));
 
-    // Clamp horizontal expansion to prevent mid-pack masks from sprawling into side seams
-    const maxAllowedWidth = 380; // 38% max width
-    if (w < 400 && (newXmax - newXmin) > maxAllowedWidth) {
+    const maxAllowedWidth = 360; // 36% max width constraint
+    if (w < 380 && (newXmax - newXmin) > maxAllowedWidth) {
       const center = (xmin + xmax) / 2;
       newXmin = Math.max(0, Math.round(center - maxAllowedWidth / 2));
       newXmax = Math.min(1000, Math.round(center + maxAllowedWidth / 2));
@@ -458,6 +457,45 @@
       Math.min(1000, Math.round(ymax + padY)),
       newXmax
     ];
+  }
+
+  // Auto-Union Horizontal Neighbors on the Same Line
+  function autoUnionHorizontalNeighbors(boxes, hGapTolerance = 35) {
+    if (boxes.length <= 1) return boxes;
+    let merged = boxes.map(b => [...b]);
+    let changed = true;
+
+    while (changed) {
+      changed = false;
+      for (let i = 0; i < merged.length; i++) {
+        for (let j = i + 1; j < merged.length; j++) {
+          const [y1_min, x1_min, y1_max, x1_max] = merged[i];
+          const [y2_min, x2_min, y2_max, x2_max] = merged[j];
+
+          // Check if vertically aligned (same horizontal row)
+          const vOverlap = Math.min(y1_max, y2_max) - Math.max(y1_min, y2_min);
+          const minH = Math.min(y1_max - y1_min, y2_max - y2_min);
+          const isSameRow = vOverlap > minH * 0.45;
+
+          // Check horizontal proximity or overlap
+          const isAdjacentH = !(x1_max + hGapTolerance < x2_min || x2_max + hGapTolerance < x1_min);
+
+          if (isSameRow && isAdjacentH) {
+            merged[i] = [
+              Math.min(y1_min, y2_min),
+              Math.min(x1_min, x2_min),
+              Math.max(y1_max, y2_max),
+              Math.max(x1_max, x2_max)
+            ];
+            merged.splice(j, 1);
+            changed = true;
+            break;
+          }
+        }
+        if (changed) break;
+      }
+    }
+    return merged;
   }
 
   function mergeCloseBoxes(boxes, thresholdX = 40, thresholdY = 60) {
@@ -504,8 +542,13 @@
     const paddingRatio = paddingVal === "auto" ? aiRecommendedMargin : parseFloat(paddingVal);
     const shouldMerge = document.getElementById("mergeSelect").value === "true";
 
+    // 1. Expand AI boxes
     let processedBoxes = rawAiBoxes.map(b => expandBox(b, paddingRatio));
 
+    // 2. Always auto-union horizontal same-line neighbors
+    processedBoxes = autoUnionHorizontalNeighbors(processedBoxes, 35);
+
+    // 3. Optional vertical cluster fusion
     if (shouldMerge) {
       processedBoxes = mergeCloseBoxes(processedBoxes, 40, 60);
     }
@@ -519,32 +562,76 @@
       const w = ((xmax - xmin) / 1000) * canvas.width;
       const h = ((ymax - ymin) / 1000) * canvas.height;
 
-      if (mode === "pixelate") {
+      if (mode === "ambient") {
+        applyAmbientBlock(x, y, w, h);
+      } else if (mode === "pixelate") {
         applyPixelation(x, y, w, h);
       } else if (mode === "solid") {
         applySolidTape(x, y, w, h);
       } else {
-        applyZeroLeakBlur(x, y, w, h);
+        applyFrostedDiffusion(x, y, w, h);
       }
     });
 
     document.getElementById("downloadBtn").style.display = "inline-block";
   }
 
-  // 100% Opaque 4x4 Bilinear Gradient Pipeline
-  function applyZeroLeakBlur(x, y, w, h) {
+  // Mode 1: Dynamic Frosted Diffusion (Preserves natural packaging sunbursts and gradients)
+  function applyFrostedDiffusion(x, y, w, h) {
     if (w <= 0 || h <= 0) return;
     const rw = Math.max(1, Math.round(w));
     const rh = Math.max(1, Math.round(h));
 
-    // 1. Extreme 4x4 Downsample: Mathematically destroys letter strokes into ambient light values
+    const pad = 40;
+    const srcX = Math.max(0, x - pad);
+    const srcY = Math.max(0, y - pad);
+    const srcW = Math.min(loadedImage.naturalWidth - srcX, rw + pad * 2);
+    const srcH = Math.min(loadedImage.naturalHeight - srcY, rh + pad * 2);
+
+    const off = document.createElement("canvas");
+    off.width = srcW;
+    off.height = srcH;
+    const offCtx = off.getContext("2d");
+
+    // Downsample pass (8%) to break sharp font glyphs
+    const scale = 0.08;
+    const mini = document.createElement("canvas");
+    mini.width = Math.max(1, Math.floor(srcW * scale));
+    mini.height = Math.max(1, Math.floor(srcH * scale));
+    const miniCtx = mini.getContext("2d");
+    miniCtx.drawImage(loadedImage, srcX, srcY, srcW, srcH, 0, 0, mini.width, mini.height);
+
+    offCtx.imageSmoothingEnabled = false;
+    offCtx.drawImage(mini, 0, 0, mini.width, mini.height, 0, 0, srcW, srcH);
+    offCtx.imageSmoothingEnabled = true;
+
+    // Heavy Gaussian diffusion to smoothly blend the packaging sunburst
+    const blurCanvas = document.createElement("canvas");
+    blurCanvas.width = srcW;
+    blurCanvas.height = srcH;
+    const bCtx = blurCanvas.getContext("2d");
+    bCtx.filter = "blur(26px)";
+    bCtx.drawImage(off, 0, 0);
+
+    const offsetX = x - srcX;
+    const offsetY = y - srcY;
+    ctx.save();
+    ctx.drawImage(blurCanvas, offsetX, offsetY, rw, rh, x, y, rw, rh);
+    ctx.restore();
+  }
+
+  // Mode 2: Ambient Gradient Block (4x4 Solid Color Synthesizer for Solid Bottles)
+  function applyAmbientBlock(x, y, w, h) {
+    if (w <= 0 || h <= 0) return;
+    const rw = Math.max(1, Math.round(w));
+    const rh = Math.max(1, Math.round(h));
+
     const sampleCanvas = document.createElement("canvas");
     sampleCanvas.width = 4;
     sampleCanvas.height = 4;
     const sCtx = sampleCanvas.getContext("2d");
     sCtx.drawImage(loadedImage, x, y, rw, rh, 0, 0, 4, 4);
 
-    // 2. Offscreen buffer with internal margin to prevent Gaussian edge feathering
     const pad = 24;
     const offW = rw + pad * 2;
     const offH = rh + pad * 2;
@@ -553,12 +640,10 @@
     off.height = offH;
     const offCtx = off.getContext("2d");
 
-    // Bilinear upscale of the 4x4 grid across the buffer
     offCtx.imageSmoothingEnabled = true;
     offCtx.imageSmoothingQuality = "high";
     offCtx.drawImage(sampleCanvas, 0, 0, 4, 4, 0, 0, offW, offH);
 
-    // 3. Smooth the bilinear gradient with Gaussian blur
     const blurCanvas = document.createElement("canvas");
     blurCanvas.width = offW;
     blurCanvas.height = offH;
@@ -566,7 +651,6 @@
     bCtx.filter = "blur(20px)";
     bCtx.drawImage(off, 0, 0);
 
-    // 4. Overwrite base canvas at [x, y, rw, rh] (100% opaque, zero alpha bleed)
     ctx.save();
     ctx.drawImage(blurCanvas, pad, pad, rw, rh, x, y, rw, rh);
     ctx.restore();
