@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Deal Sanitizer & Auto-Masker v1.0.22</title>
+  <title>Deal Sanitizer & Auto-Masker v1.0.23</title>
   <style>
     body { 
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
@@ -98,13 +98,13 @@
 </head>
 <body>
 
-<div class="app-version-fixed">v1.0.22</div>
+<div class="app-version-fixed">v1.0.23</div>
 
 <div class="container">
   <div class="card full-width">
     <h2>
       Automated Deal Asset Sanitizer 
-      <span class="version-header-badge">v1.0.22</span>
+      <span class="version-header-badge">v1.0.23</span>
     </h2>
     
     <label>Gemini API Key</label>
@@ -251,6 +251,11 @@
       safe = safe.replace(regex, replacement);
     });
 
+    // Ensure Laundry Detergent descriptor is preserved for pod packaging
+    if (/power\s+paks/i.test(safe) && !/laundry\s+detergent/i.test(safe)) {
+      safe = safe.replace(/(?:5\s+in\s+1\s+)?power\s+paks/i, "5-in-1 Laundry Detergent Power Paks");
+    }
+
     safe = safe.replace(/\b(\w+)\s+\1\b/gi, "$1");
     return safe.replace(/\s+/g, " ").trim();
   }
@@ -334,8 +339,7 @@
       Scan the ENTIRE packaging surface. Return normalized coordinates [ymin, xmin, ymax, xmax] (0 to 1000 integers) covering:
       
       1. AEROSOL SPRAY CANS & BOTTLE CLUSTERS (CRITICAL BOUNDARY ENFORCEMENT):
-         - For aerosol spray cans (e.g., Lysol Air Sanitizer): The bounding box for EACH can MUST start directly below the white cap rim and extend DOWNWARD all the way to the top border of the blue bottom base packaging.
-         - This single box per can MUST completely enclose the brand crest, the word 'SANITIZER', and the red medical claim strip ('Eliminates Odors by Killing 99.9%'). Do NOT stop above the word 'SANITIZER'.
+         - For aerosol spray cans (e.g., Lysol Air Sanitizer): The mask box MUST cover the entire upper and middle label continuously. Set the top of the box right under the white shoulder/cap and extend the bottom edge ALL THE WAY DOWN to the top of the dark blue base banner, completely covering the brand crest, the word 'SANITIZER', and any red claim strips ('Eliminates Odors by Killing 99.9%'). Do NOT stop above the word 'SANITIZER'.
       
       2. POUCH CO-BRAND BANNERS & CORNER BADGES:
          - For co-branded clusters (e.g., 'OxiClean' + 'ODOR BLASTERS'): Cover the logo and slanted tagline 'ODOR BLASTERS' tightly without expanding into the far right packaging seam.
@@ -353,8 +357,10 @@
       TASK 2: PACKAGING GEOMETRY & RECOMMENDED MARGIN
       Select best margin from: [10, 12.5, 15, 17.5, 20].
 
-      TASK 3: COMPLIANT GENERIC TITLE
-      Generate a brand-free, trademark-free title incorporating verified volume/count and generic product type.
+      TASK 3: COMPLIANT GENERIC TITLE (MANDATORY STRUCTURE)
+      Format: [Count/Volume] + [Generic Product Category] + [Key Safe Features] + [Generic Scent if applicable].
+      RULE: You MUST include the generic product category (e.g., 'Laundry Detergent', 'Fabric Refresher', 'Household Cleaner', 'Hair Care Set'). Never drop the product category name.
+      Example: "72-Count 5-in-1 Laundry Detergent Power Paks - Fresh Scent"
       Example: "3-Pack 10 Fl. Oz Each Air Fabric Refresher Spray - Simple Fresh Scent"
 
       TASK 4: POSTER SUGGESTIONS
@@ -405,7 +411,7 @@
       list.innerHTML = "";
 
       const defaultTip = document.createElement("li");
-      defaultTip.innerHTML = `<b>Boundary Enforcement Active:</b> Aerosol boxes extend down to base banners; pouch masks are clamped to prevent edge sprawl.`;
+      defaultTip.innerHTML = `<b>Category Retention Active:</b> Generic category names (e.g., 'Laundry Detergent') are preserved for conversion.`;
       list.appendChild(defaultTip);
 
       if (parsed.suggestions && Array.isArray(parsed.suggestions)) {
@@ -427,7 +433,7 @@
     }
   });
 
-  // Margin Expansion with Horizontal Sprawl Clamping
+  // Margin Expansion with Strict 38% Horizontal Clamping
   function expandBox(box, paddingRatio) {
     const [ymin, xmin, ymax, xmax] = box;
     const w = xmax - xmin;
@@ -438,11 +444,12 @@
     let newXmin = Math.max(0, Math.round(xmin - padX));
     let newXmax = Math.min(1000, Math.round(xmax + padX));
 
-    // Clamp horizontal expansion so masks don't sprawl across >45% of image width unless already wide
-    if (w < 420 && (newXmax - newXmin) > 460) {
+    // Clamp horizontal expansion to prevent mid-pack masks from sprawling into side seams
+    const maxAllowedWidth = 380; // 38% max width
+    if (w < 400 && (newXmax - newXmin) > maxAllowedWidth) {
       const center = (xmin + xmax) / 2;
-      newXmin = Math.max(0, Math.round(center - 230));
-      newXmax = Math.min(1000, Math.round(center + 230));
+      newXmin = Math.max(0, Math.round(center - maxAllowedWidth / 2));
+      newXmax = Math.min(1000, Math.round(center + maxAllowedWidth / 2));
     }
 
     return [
