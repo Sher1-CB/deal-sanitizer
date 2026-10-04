@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Deal Sanitizer & Auto-Masker v1.2.06</title>
+  <title>Deal Sanitizer & Auto-Masker v1.2.07</title>
   <style>
     body { 
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
@@ -98,13 +98,13 @@
 </head>
 <body>
 
-<div class="app-version-fixed">v1.2.06</div>
+<div class="app-version-fixed">v1.2.07</div>
 
 <div class="container">
   <div class="card full-width">
     <h2>
       Automated Deal Asset Sanitizer 
-      <span class="version-header-badge">v1.2.06</span>
+      <span class="version-header-badge">v1.2.07</span>
     </h2>
     
     <label>Gemini API Key</label>
@@ -402,59 +402,51 @@
 
     try {
       const detectPrompt = `
-      Examine this product packaging image with absolute affiliate compliance precision.
+      You are an expert computer vision system for digital packaging and trademark de-identification.
+      Analyze this product packaging image with forensic precision.
 
-      TASK 1: COMPLETE VISUAL BOUNDING BOXES (PHYSICAL PACKAGING ARCHITECTURE)
-      Scan the packaging surface. Do NOT return fragmented, broken words. Return normalized coordinates [ymin, xmin, ymax, xmax] (0 to 1000 integers) covering the complete functional visual block:
+      STAGE 1: VISUAL AUDIT & SURFACE RECONNAISSANCE
+      Before assigning coordinates, inspect the packaging surface and identify:
+      1. All trademarked brand names, logos, cursive lettering, emblems, and mascot silhouettes.
+      2. Outermost script flourishes (e.g., trailing letter tails like 'e' on cursive logos) and edge typography.
+      3. Regulatory, health, or promotional claim strips (e.g. 'Eliminates Odors by Killing 99.9%...', 'Kills Cold & Flu Viruses', scent badges with ™/®).
+      4. Physical packaging seams: spray cap collars, nozzle shoulders, bottom multipack wraps, label die-cut seams, and outer bottle contours.
 
-      1. MULTI-PACK SPRAY CANS & BOTTLE CLUSTERS (e.g. Febreze, Air Wick 3-Packs):
-         - CRITICAL: Return a SINGLE CONTIGUOUS BOUNDING BOX enclosing ALL cans horizontally across the cluster.
-         - xmin: Must align with the outer curved edge of the leftmost can.
-         - xmax: Must align with the outer curved edge of the rightmost can.
-         - ymin: Must start directly beneath the plastic nozzle hoods.
-         - ymax: Must extend all the way down to firmly touch/overlap the top edge of the multipack base wrap (e.g., where '3-PACK' starts).
-         - This single box MUST conceal: all brand scripts, 'AIR', 'SANITIZER', and the full red claim strip ('Eliminates Odors by Killing 99.9%...').
+      STAGE 2: VISUAL BOUNDING BOXES (PHYSICAL ANCHORING)
+      Return normalized coordinates [ymin, xmin, ymax, xmax] (integers 0 to 1000) adhering strictly to physical packaging landmarks:
 
-      2. JUGS & LIQUID BOTTLES (e.g., Lysol, Clorox):
-         - Cover the upper label panel as a complete cohesive geometric zone:
-           * Start near the neck collar to cover arched health claims ('KILLS COLD, FLU & VIRUSES').
-           * Extend to cover the diagonal brand script and 'SANITIZER'.
-           * Enclose the entire red burst badge on the left edge ('KILLS 99.9%') out to the physical packaging edge contour.
-           * PRESERVE: 'LAUNDRY', fluid ounces, and the clothes graphic below.
+      1. MULTI-PACK CYLINDERS & SPRAY CANS:
+         - Top boundary (ymin): Anchor directly to the bottom line of the plastic spray nozzles.
+         - Bottom boundary (ymax): Extend downward until it FIRMLY OVERLAPS the top edge of the footer wrap/card (e.g., where '3-PACK' starts). The red claim line MUST be fully submerged inside the box.
+         - Left/Right boundaries (xmin/xmax): Stretch from the outermost physical silhouette of the leftmost can to the outermost physical silhouette of the rightmost can, completely swallowing all cursive flourishes (including any trailing letters like 'e') and side graphics.
 
-      3. BOTTLE SETS & POUCHES (e.g., Aussie Kids, Arm & Hammer):
-         - For pouch co-branding: Return complete horizontal blocks enclosing the primary circular emblem, plus OxiClean / Odor Blasters, and ™/® scent badges.
-         - For shampoo/conditioner sets: Enclose the brand typography and mascot silhouette across each bottle chest.
+      2. LIQUID JUGS & ASYMMETRICAL BOTTLES:
+         - Top boundary: Anchor near the neck/shoulder seam to engulf arched claims ('KILLS COLD, FLU...').
+         - Outer side boundary: Extend completely to the outer physical container contour to submerge any scalloped burst badges ('KILLS 99.9%').
+         - Keep 'LAUNDRY', counts, and garment illustrations clean, but mask 'SANITIZER'.
 
-      CRITICAL WHITELIST (KEEP 100% VISIBLE & SHARP):
-      - Quantitative specifications: Counts and volumes (e.g. '72 PAKS', '90 FL OZ', '3-PACK 10 Fl.Oz Each', '16 oz', '8 oz').
-      - Generic product terms: 'LAUNDRY', 'MOIST', 'SHAMPOO', 'CONDITIONER', 'DETANGLER', '5 in 1 POWER PAKS', 'Simple Fresh Scent'.
-      - Base graphics, clothes illustrations, and neutral container geometry.
+      3. POUCHES & BOXES:
+         - Mask primary circular emblems, secondary co-brand clusters (e.g., 'plus OxiClean / ODOR BLASTERS'), and corner scent badges completely.
 
-      TASK 2: PACKAGING GEOMETRY & RECOMMENDED RELATIVE MARGIN
-      Select best margin from: [12, 15, 18, 22].
+      WHITELIST (NEVER MASK):
+      - Volume/count indicators ('72 PAKS', '90 FL OZ', '3-PACK 10 Fl.Oz Each', '16 oz', '8 oz').
+      - Generic category words: 'LAUNDRY', 'MOIST', 'SHAMPOO', 'CONDITIONER', 'DETANGLER', '5 in 1 POWER PAKS', 'Simple Fresh Scent'.
+      - Bottom footer wraps, base illustrations, and physical packaging handles.
 
-      TASK 3: COMPLIANT GENERIC TITLE
-      Format: [Count/Volume] + [Generic Product Category] + [Key Safe Features] + [Generic Scent if applicable].
-      Example: "3-Pack 10 Fl. Oz Each Air Refresher Spray - Simple Fresh Scent"
+      STAGE 3: COMPLIANT TITLE & BANNER PLACEMENT
+      - title: [Count/Volume] + [Generic Category] + [Key Safe Features] + [Generic Scent]. (No brand words).
+      - banner_placement_suggestions: 2-3 precise physical location directions for placing manual cover stickers/ribbons.
 
-      TASK 4: MANUAL BANNER / COVER PLACEMENT INSTRUCTIONS
-      Suggest EXACT PHYSICAL PLACEMENT where a manual banner, opaque ribbon, or cover badge should be positioned to block trademarks.
-      DO NOT suggest marketing text (no "Clip Coupon" or "Hot Deal").
-      Examples:
-      - "Place a wide horizontal banner directly across the middle of all three spray cans, covering between the spray nozzles down to the '3-PACK' footer wrap."
-      - "Place a horizontal banner over the upper center circle to conceal the Arm & Hammer logo."
-      - "Cover the Lysol brand by placing an angled/diagonal banner across the upper bottle label and over the left red burst badge."
-
-      Return JSON:
+      Return ONLY valid JSON matching this schema:
       {
+        "visual_audit": {
+          "identified_trademarks": ["..."],
+          "packaging_anchors_used": "..."
+        },
         "boxes": [[ymin, xmin, ymax, xmax]],
         "recommended_margin_pct": 16,
         "suggested_title": "...",
-        "banner_placement_suggestions": [
-          "Place a banner on top of [Brand/Element] at [location]...",
-          "Cover [Brand/Element] by using a banner across [location]..."
-        ]
+        "banner_placement_suggestions": ["..."]
       }
       `;
 
