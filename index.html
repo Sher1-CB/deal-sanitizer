@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Deal Sanitizer & Auto-Masker v1.2.11</title>
+  <title>Deal Sanitizer & Auto-Masker v1.2.12</title>
   <style>
     body { 
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
@@ -98,13 +98,13 @@
 </head>
 <body>
 
-<div class="app-version-fixed">v1.2.11</div>
+<div class="app-version-fixed">v1.2.12</div>
 
 <div class="container">
   <div class="card full-width">
     <h2>
       Automated Deal Asset Sanitizer 
-      <span class="version-header-badge">v1.2.11</span>
+      <span class="version-header-badge">v1.2.12</span>
     </h2>
     
     <label>Gemini API Key</label>
@@ -429,10 +429,11 @@
          - Return a DEDICATED HORIZONTAL STRIP BOX specifically covering the continuous red claim ribbon ('Eliminates Odors by Killing 99.9%...') stretching all the way across from the left can to the right can right above the '3-PACK' footer wrap.
 
      2. LIQUID JUGS & ASYMMETRICAL BOTTLES:
-         - Main label box: Enclose top neck arched claims, diagonal brand script, and 'SANITIZER' (leave 'LAUNDRY' and volume intact).
-         - DEDICATED LEFT FLANK BADGE BOX:
-           * For any red starburst/claim badge ('KILLS 99.9%') on the left flank, return a SEPARATE box.
-           * RULE: Set xmin to 0 (hard left edge of image) to completely submerge all outer red scalloped teeth.
+         - Main label box: 
+           * Top boundary (ymin): MUST start directly at the dark blue plastic neck collar (to submerge the top arched 'COLD, FLU & VIRUSES' text).
+           * Bottom boundary (ymax): Extend down across 'SANITIZER' with 100% opacity, stopping cleanly above 'CRISP LINEN SCENT' (keep 'LAUNDRY' visible).
+         - DEDICATED FLANK BADGE BOX:
+           * For any red starburst/claim badge ('KILLS 99.9%') on the left flank, return a separate box spanning horizontally from the outer edge of the bottle (xmin: 0) into the label.
 
       3. POUCHES & BOXES:
          - Mask primary circular emblems, secondary co-brand clusters (e.g., 'plus OxiClean / ODOR BLASTERS'), and corner scent badges completely.
@@ -531,11 +532,11 @@
     let newYmax = Math.min(1000, ymax + padY);
     let newXmax = Math.min(1000, xmax + padX);
 
-    // Contextual Edge Snap: If any mask touches or borders the outer flanks (< 50 or > 950),
+    // Perimeter Edge Snap: If any mask approaches the outer flanks (< 90 or > 910),
     // firmly snap it to the canvas border so edge teeth/flourishes never leak through feathering
-    if (newXmin <= 50) newXmin = 0;
-    if (newXmax >= 950) newXmax = 1000;
-    if (newYmin <= 40) newYmin = 0;
+    if (newXmin <= 90) newXmin = 0;
+    if (newXmax >= 910) newXmax = 1000;
+    if (newYmin <= 60) newYmin = 0;
 
     return [newYmin, newXmin, newYmax, newXmax];
   }
