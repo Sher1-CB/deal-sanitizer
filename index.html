@@ -2,13 +2,13 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Deal Sanitizer & Auto-Masker v1.2.25</title>
+  <title>Deal Sanitizer & Auto-Masker v1.2.26</title>
   <style>
     body { 
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
       background: #0f172a; 
       color: #f8fafc; 
-      padding: 2.5rem 2rem 2rem; 
+      padding: 1.5rem 2rem 2rem; 
       position: relative;
     }
     
@@ -40,11 +40,11 @@
       font-weight: 600;
     }
 
-    .container { max-width: 1000px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; }
-    .card { background: #1e293b; padding: 1.5rem; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.5); }
-    .full-width { grid-column: span 2; }
-    label { display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.4rem; color: #94a3b8; }
-    input, select, button { width: 100%; box-sizing: border-box; margin-bottom: 1rem; padding: 0.6rem; border-radius: 6px; border: 1px solid #334155; background: #0f172a; color: #fff; }
+    .container { max-width: 1400px; margin: 0 auto; display: flex; flex-direction: column; gap: 1.5rem; }
+    .card { background: #1e293b; padding: 1.25rem 1.5rem; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.5); }
+    
+    label { display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.35rem; color: #94a3b8; }
+    input, select, button { width: 100%; box-sizing: border-box; margin-bottom: 0.75rem; padding: 0.55rem; border-radius: 6px; border: 1px solid #334155; background: #0f172a; color: #fff; }
     
     button { background: #3b82f6; border: none; font-weight: bold; cursor: pointer; transition: background 0.2s; }
     button:hover { background: #2563eb; }
@@ -55,160 +55,154 @@
     button.success { background: #10b981; }
     button.success:hover { background: #059669; }
 
-    .btn-row { display: flex; gap: 0.5rem; margin-bottom: 0.75rem; }
+    .top-controls-grid {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr 1fr 1fr 1fr;
+      gap: 1rem;
+      align-items: start;
+    }
+
+    .btn-row { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
     .btn-row button { margin-bottom: 0; }
 
-    .grid-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+    /* Side-by-Side Dual Canvas Workspace */
+    .dual-preview-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+    }
 
-    canvas { max-width: 100%; height: auto; border-radius: 6px; background: #000; display: block; cursor: crosshair; }
-    .preview-box { display: flex; flex-direction: column; align-items: center; justify-content: flex-start; }
-    .hint { font-size: 0.75rem; color: #94a3b8; margin-top: 0.3rem; margin-bottom: 1rem; }
+    .canvas-panel {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background: #1e293b;
+      padding: 1.25rem;
+      border-radius: 8px;
+    }
+
+    .canvas-panel h3 {
+      margin-top: 0;
+      margin-bottom: 0.4rem;
+      font-size: 1.05rem;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    canvas { max-width: 100%; height: auto; border-radius: 6px; background: #000; display: block; }
+    #outputCanvas { cursor: crosshair; }
+
+    .hint { font-size: 0.75rem; color: #94a3b8; margin-bottom: 0.75rem; text-align: center; }
 
     .compliance-reminder-box {
       background: #2a080c;
       border: 1px solid #ef4444;
       border-radius: 6px;
       padding: 0.75rem 1rem;
-      margin-top: 0.5rem;
-      margin-bottom: 1rem;
+      margin-top: 0.75rem;
       color: #fca5a5;
-      font-size: 0.82rem;
+      font-size: 0.85rem;
       line-height: 1.45;
       display: none;
     }
-    .compliance-reminder-box b {
-      color: #ffffff;
-    }
+    .compliance-reminder-box b { color: #ffffff; }
 
     .title-row { display: flex; gap: 0.5rem; }
     .title-row input { margin-bottom: 0; font-size: 0.95rem; font-weight: 500; color: #38bdf8; background: #090d16; border-color: #0284c7; }
     .title-row button { width: 140px; margin-bottom: 0; background: #0284c7; }
     .title-row button:hover { background: #0369a1; }
-
-    .banner-guide-box {
-      background: #091322;
-      border: 1px solid #1e3a5f;
-      border-left: 4px solid #f59e0b;
-      border-radius: 6px;
-      padding: 1rem 1.25rem;
-      margin-top: 0.5rem;
-    }
-    .banner-guide-title {
-      font-size: 0.9rem;
-      font-weight: bold;
-      color: #f59e0b;
-      margin-bottom: 0.5rem;
-      display: flex;
-      align-items: center;
-      gap: 0.4rem;
-    }
-    .banner-guide-list {
-      margin: 0;
-      padding-left: 1.2rem;
-      color: #e2e8f0;
-      font-size: 0.85rem;
-      line-height: 1.6;
-    }
-    .banner-guide-list li { margin-bottom: 0.4rem; }
   </style>
 </head>
 <body>
 
-<div class="app-version-fixed">v1.2.25</div>
+<div class="app-version-fixed">v1.2.26</div>
 
 <div class="container">
-  <div class="card full-width">
-    <h2>
-      Automated Deal Asset Sanitizer 
-      <span class="version-header-badge">v1.2.25</span>
-    </h2>
-    
-    <label>Gemini API Key</label>
-    <input type="password" id="apiKey" placeholder="AIzaSy...">
-
-    <label id="modelSelectLabel">Gemini Model (Detecting high-quota Lite models...)</label>
-    <select id="modelSelect">
-      <option value="gemini-2.5-flash-lite" selected>gemini-2.5-flash-lite (Connecting...)</option>
-    </select>
-  </div>
-
+  <!-- TOP CARD: API & SETTINGS -->
   <div class="card">
-    <h3>Input Controls</h3>
-    
-    <label>Product Image</label>
-    <input type="file" id="imageInput" accept="image/*">
-
-    <label>Sanitization Scope</label>
-    <select id="sanitizationScope">
-      <option value="co_branded" selected>Deep Scan: Dual Brands + Graphic Labels + Claims</option>
-      <option value="logos_only">Primary Brand Logos Only</option>
-    </select>
-
-    <label>Masking Visual Style</label>
-    <select id="maskMode">
-      <option value="diffusion" selected>Radial Frosted Diffusion (Soft-Edge Feather)</option>
-      <option value="ambient">Ambient Gradient Block (Solid Bottles)</option>
-      <option value="pixelate">Mosaic Pixelation</option>
-      <option value="solid">Clean Dark Tape</option>
-    </select>
-
-    <div class="grid-2col">
-      <div>
-        <label id="paddingLabel">Mask Margin (Relative)</label>
-        <select id="paddingSelect">
-          <option value="auto" selected>Auto (AI-Contextual: 10%–16%)</option>
-          <option value="0.10">10% (Snug)</option>
-          <option value="0.14">14% (Standard)</option>
-          <option value="0.18">18% (Extended)</option>
-          <option value="0.22">22% (Broad Shield)</option>
-        </select>
-      </div>
-      <div>
-        <label>Detection Outlines (Red Boxes)</label>
-        <select id="showRedBoxesSelect">
-          <option value="true" selected>Show Target Rectangles (Audit Mode)</option>
-          <option value="false">Hide Outlines (Clean View)</option>
-        </select>
-      </div>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+      <h2 style="margin: 0;">
+        Automated Deal Asset Sanitizer 
+        <span class="version-header-badge">v1.2.26</span>
+      </h2>
+      <div style="font-size: 0.85rem; color: #38bdf8;" id="modelStatus">Active: Detecting model...</div>
     </div>
 
-    <div class="btn-row" style="margin-top: 1.25rem;">
-      <button id="processBtn">Process Image with AI</button>
+    <!-- TOP ROW: INPUT CONTROLS -->
+    <div class="top-controls-grid">
+      <div>
+        <label>Gemini API Key</label>
+        <input type="password" id="apiKey" placeholder="AIzaSy...">
+      </div>
+      <div>
+        <label>Product Image</label>
+        <input type="file" id="imageInput" accept="image/*">
+      </div>
+      <div>
+        <label>Sanitization Scope</label>
+        <select id="sanitizationScope">
+          <option value="co_branded" selected>Deep Scan: Dual Brands + Claims</option>
+          <option value="logos_only">Primary Brand Logos Only</option>
+        </select>
+      </div>
+      <div>
+        <label>Masking Visual Style</label>
+        <select id="maskMode">
+          <option value="diffusion" selected>Radial Frosted Diffusion</option>
+          <option value="ambient">Ambient Gradient Block</option>
+          <option value="pixelate">Mosaic Pixelation</option>
+          <option value="solid">Clean Dark Tape</option>
+        </select>
+      </div>
+      <div>
+        <label id="paddingLabel">Mask Margin</label>
+        <select id="paddingSelect">
+          <option value="auto" selected>Auto (AI-Contextual: Snug)</option>
+          <option value="0.08">8% (Ultra-Snug)</option>
+          <option value="0.12">12% (Standard Snug)</option>
+          <option value="0.16">16% (Medium)</option>
+        </select>
+      </div>
     </div>
 
     <div class="btn-row">
-      <button id="resetMasksBtn" class="secondary">Reset Masks</button>
-      <button id="uploadNewBtn" class="danger">Upload New Image</button>
+      <button id="processBtn" style="flex: 2;">Process Image with AI</button>
+      <button id="resetMasksBtn" class="secondary" style="flex: 1;">Reset Masks</button>
+      <button id="uploadNewBtn" class="danger" style="flex: 1;">Upload New Image</button>
     </div>
 
-    <!-- COMPLIANCE REMINDER BOX PLACED BELOW UPLOAD NEW IMAGE -->
+    <!-- COMPLIANCE REMINDER BOX BELOW CONTROLS -->
     <div id="complianceReminder" class="compliance-reminder-box">
-      ⚠️ <b>Operator Compliance Check:</b> The <b>red hollow rectangles</b> identify required trademark and regulatory claim targets. If any red-outlined target is not completely submerged by diffusion, <b>click and drag directly on the canvas preview</b> to manually seal the mask before downloading.
+      ⚠️ <b>Operator Compliance Check:</b> The <b>Red Target Outlines</b> on the left show all detected trademarks and restricted claims. If any red target is not completely obscured in the right preview, <b>click and drag directly on the right preview</b> to add a manual patch before downloading.
     </div>
   </div>
 
-  <div class="card preview-box">
-    <h3>Masked Output Preview</h3>
-    <div class="hint">💡 <b>Tip:</b> Click and drag directly on the image to manually mask any missed secondary text.</div>
-    <canvas id="outputCanvas"></canvas>
-    
-    <div class="btn-row" style="width: 100%; margin-top: 1rem;">
-      <button id="reapplyBtn" class="secondary">Re-apply Style</button>
-      <button id="undoBtn" class="secondary">Undo Last Mask</button>
-      <button id="downloadBtn" class="success" style="display:none;">Download Image</button>
+  <!-- DUAL WORKSPACE: SIDE-BY-SIDE CANVASES -->
+  <div class="dual-preview-grid">
+    <!-- LEFT PANEL: RAW IMAGE WITH RED TARGET BOXES -->
+    <div class="canvas-panel">
+      <h3><span>🎯</span> Detected Target Areas (Audit View)</h3>
+      <div class="hint">Shows red outlines around detected trademarks and restricted claim text.</div>
+      <canvas id="targetCanvas"></canvas>
     </div>
-  </div>
 
-  <div class="card full-width">
-    <div id="bannerPlacementBox" class="banner-guide-box" style="display:none;">
-      <div class="banner-guide-title">
-        <span>🏷️</span> Manual Banner & Cover Placement Suggestions
+    <!-- RIGHT PANEL: SANITIZED OUTPUT (INTERACTIVE) -->
+    <div class="canvas-panel">
+      <h3><span>✨</span> Masked Output Preview (Interactive)</h3>
+      <div class="hint">💡 Click and drag directly on this canvas to manually patch any missed areas.</div>
+      <canvas id="outputCanvas"></canvas>
+      
+      <div class="btn-row" style="width: 100%; margin-top: 1rem;">
+        <button id="reapplyBtn" class="secondary">Re-apply Style</button>
+        <button id="undoBtn" class="secondary">Undo Last Patch</button>
+        <button id="downloadBtn" class="success" style="display:none;">Download Masked Image</button>
       </div>
-      <ul id="bannerGuideList" class="banner-guide-list"></ul>
     </div>
   </div>
 
-  <div class="card full-width">
+  <!-- COMPLIANT TITLE -->
+  <div class="card">
     <label style="font-size: 0.95rem; color: #38bdf8; font-weight: bold;">Suggested Compliant Title (Brand & Trademark Free)</label>
     <div class="title-row">
       <input type="text" id="suggestedTitle" readonly placeholder="Compliant, generic title will automatically appear here after processing...">
@@ -224,105 +218,75 @@
 
   let rawAiBoxes = [];
   let manualBoxes = [];
-  let aiRecommendedMargin = 0.12;
+  let activeSelectedModel = "gemini-2.5-flash-lite";
 
   let isDragging = false;
   let dragStartX = 0;
   let dragStartY = 0;
 
-  const canvas = document.getElementById("outputCanvas");
-  const ctx = canvas.getContext("2d");
+  const targetCanvas = document.getElementById("targetCanvas");
+  const tCtx = targetCanvas.getContext("2d");
+
+  const outputCanvas = document.getElementById("outputCanvas");
+  const ctx = outputCanvas.getContext("2d");
 
   const keyInput = document.getElementById("apiKey");
   const savedKey = localStorage.getItem("deal_gemini_key");
   if (savedKey) keyInput.value = savedKey;
 
-  // DYNAMIC HIGH-QUOTA MODEL SELECTION (Locks onto high-rate-limit Lite tiers)
-  async function autoDetectAndSelectModel(key) {
+  // AUTO-DETECT 3RD-TO-LATEST LITE MODEL DYNAMICALLY
+  async function autoDetectLiteModel(key) {
     if (!key) return;
-    const select = document.getElementById("modelSelect");
-    const label = document.getElementById("modelSelectLabel");
+    const status = document.getElementById("modelStatus");
 
     try {
-      label.textContent = "Gemini Model (Detecting high-quota Lite models...)";
+      status.textContent = "Detecting high-quota Lite model...";
       const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`);
       const data = await res.json();
-      if (!data.models || !Array.isArray(data.models)) {
-        label.textContent = "Gemini Model";
-        return;
-      }
+      if (!data.models || !Array.isArray(data.models)) return;
 
-      const allGenModels = data.models
+      const liteModels = data.models
         .map(m => m.name.replace("models/", ""))
-        .filter(name => {
-          const lower = name.toLowerCase();
-          return lower.includes("gemini") && 
-                 !lower.includes("preview") &&
-                 !lower.includes("embedding") &&
-                 !lower.includes("aqa");
+        .filter(n => {
+          const l = n.toLowerCase();
+          return l.includes("gemini") && (l.includes("lite") || l.includes("8b")) && !l.includes("preview") && !l.includes("embedding");
         });
 
-      // Target Lite models pool for high rate limits (1500 RPD)
-      const liteModels = allGenModels.filter(name => name.toLowerCase().includes("lite") || name.toLowerCase().includes("8b"));
-      const fallbackFlashModels = allGenModels.filter(name => name.toLowerCase().includes("flash"));
-      const targetPool = liteModels.length > 0 ? liteModels : fallbackFlashModels;
-
       const versionMap = {};
-      targetPool.forEach(name => {
-        const match = name.match(/gemini-(\d+(?:\.\d+)?)/i);
-        if (match) {
-          const ver = parseFloat(match[1]);
-          if (!versionMap[ver]) versionMap[ver] = [];
-          versionMap[ver].push(name);
+      liteModels.forEach(n => {
+        const m = n.match(/gemini-(\d+(?:\.\d+)?)/i);
+        if (m) {
+          const v = parseFloat(m[1]);
+          if (!versionMap[v]) versionMap[v] = [];
+          versionMap[v].push(n);
         }
       });
 
-      const sortedVersions = Object.keys(versionMap)
-        .map(Number)
-        .sort((a, b) => b - a);
-
-      let selectedVersion = sortedVersions[0];
-      if (sortedVersions.length >= 2) {
-        selectedVersion = sortedVersions[1]; // 2nd-to-latest generation
+      const sortedVersions = Object.keys(versionMap).map(Number).sort((a,b) => b - a);
+      let targetVersion = sortedVersions[0];
+      if (sortedVersions.length >= 3) {
+        targetVersion = sortedVersions[2]; // 3rd latest
+      } else if (sortedVersions.length === 2) {
+        targetVersion = sortedVersions[1];
       }
 
-      const candidateGroup = versionMap[selectedVersion] || targetPool;
-      let autoSelectedModel = candidateGroup[0] || "gemini-2.5-flash-lite";
-
-      select.innerHTML = "";
-      
-      const optAuto = document.createElement("option");
-      optAuto.value = autoSelectedModel;
-      optAuto.textContent = `${autoSelectedModel} (High Quota Lite Tier)`;
-      optAuto.selected = true;
-      select.appendChild(optAuto);
-
-      allGenModels
-        .filter(m => m !== autoSelectedModel)
-        .forEach(m => {
-          const opt = document.createElement("option");
-          opt.value = m;
-          opt.textContent = m;
-          select.appendChild(opt);
-        });
-
-      label.textContent = `Gemini Model (Active: ${autoSelectedModel})`;
+      const pool = versionMap[targetVersion] || liteModels;
+      activeSelectedModel = pool[0] || "gemini-2.5-flash-lite";
+      status.textContent = `Active Model: ${activeSelectedModel} (High-Quota Lite)`;
 
     } catch (err) {
-      console.warn("Dynamic model auto-detection error:", err);
-      label.textContent = "Gemini Model";
+      console.warn("Model detection error:", err);
+      activeSelectedModel = "gemini-2.5-flash-lite";
+      status.textContent = `Active Model: ${activeSelectedModel}`;
     }
   }
 
   keyInput.addEventListener("change", () => {
     const val = keyInput.value.trim();
     localStorage.setItem("deal_gemini_key", val);
-    if (val) autoDetectAndSelectModel(val);
+    if (val) autoDetectLiteModel(val);
   });
-
-  if (savedKey) {
-    autoDetectAndSelectModel(savedKey);
-  }
+  if (savedKey) autoDetectLiteModel(savedKey);
 
   function enforceSafeTitle(rawTitle) {
     if (!rawTitle) return "";
@@ -342,21 +306,16 @@
       [/\bdisinfectant(\s+spray)?\b/gi, "Cleaning Spray"],
       [/\bdisinfecting\b/gi, "Deep Cleaning"],
       [/\bantibacterial\b/gi, "Odor-Fighting"],
-      [/\bkills\s+99\.9%(?:\s+of\s+germs|\s+of\s+odor-causing\s+bacteria\s+and\s+viruses\s+in\s+the\s+air)?\b/gi, "Total Clean"],
+      [/\bkills\s+99\.9%(?:\s+of\s+germs|\s+of\s+bacteria)?\b/gi, "Total Clean"],
       [/\bclorox\b/gi, ""],
       [/\blysol\b/gi, ""],
       [/\barm\s*&\s*hammer\b/gi, ""],
       [/\boxiclean\b/gi, ""]
     ];
-    rules.forEach(([regex, replacement]) => {
-      safe = safe.replace(regex, replacement);
-    });
-
+    rules.forEach(([r, rep]) => { safe = safe.replace(r, rep); });
     if (/power\s+paks/i.test(safe) && !/laundry\s+detergent/i.test(safe)) {
       safe = safe.replace(/(?:5\s+in\s+1\s+)?power\s+paks/i, "5-in-1 Laundry Detergent Power Paks");
     }
-
-    safe = safe.replace(/\b(\w+)\s+\1\b/gi, "$1");
     return safe.replace(/\s+/g, " ").trim();
   }
 
@@ -370,12 +329,15 @@
       base64Image = evt.target.result.split(",")[1];
       loadedImage = new Image();
       loadedImage.onload = () => {
-        canvas.width = loadedImage.naturalWidth;
-        canvas.height = loadedImage.naturalHeight;
+        targetCanvas.width = loadedImage.naturalWidth;
+        targetCanvas.height = loadedImage.naturalHeight;
+        outputCanvas.width = loadedImage.naturalWidth;
+        outputCanvas.height = loadedImage.naturalHeight;
         rawAiBoxes = [];
         manualBoxes = [];
         document.getElementById("complianceReminder").style.display = "none";
-        renderAllMasks();
+        renderLeftTargetView();
+        renderRightMaskedView();
       };
       loadedImage.src = evt.target.result;
     };
@@ -386,7 +348,8 @@
     if (!loadedImage) return;
     rawAiBoxes = [];
     manualBoxes = [];
-    renderAllMasks();
+    renderLeftTargetView();
+    renderRightMaskedView();
   });
 
   document.getElementById("uploadNewBtn").addEventListener("click", () => {
@@ -394,9 +357,9 @@
     base64Image = "";
     rawAiBoxes = [];
     manualBoxes = [];
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    tCtx.clearRect(0, 0, targetCanvas.width, targetCanvas.height);
+    ctx.clearRect(0, 0, outputCanvas.width, outputCanvas.height);
     document.getElementById("suggestedTitle").value = "";
-    document.getElementById("bannerPlacementBox").style.display = "none";
     document.getElementById("downloadBtn").style.display = "none";
     document.getElementById("complianceReminder").style.display = "none";
     
@@ -407,75 +370,63 @@
 
   document.getElementById("reapplyBtn").addEventListener("click", () => {
     if (!loadedImage) return;
-    renderAllMasks();
-  });
-
-  document.getElementById("showRedBoxesSelect").addEventListener("change", () => {
-    if (!loadedImage) return;
-    renderAllMasks();
+    renderRightMaskedView();
   });
 
   document.getElementById("undoBtn").addEventListener("click", () => {
     if (manualBoxes.length > 0) {
       manualBoxes.pop();
-      renderAllMasks();
+      renderRightMaskedView();
     } else if (rawAiBoxes.length > 0) {
       rawAiBoxes.pop();
-      renderAllMasks();
+      renderLeftTargetView();
+      renderRightMaskedView();
     }
   });
 
   document.getElementById("processBtn").addEventListener("click", async () => {
     const key = keyInput.value.trim();
-    const scope = document.getElementById("sanitizationScope").value;
-    const selectedModel = document.getElementById("modelSelect").value;
-
     if (!key) return alert("Please enter your Gemini API Key.");
     if (!base64Image) return alert("Please select an image first.");
 
     const btn = document.getElementById("processBtn");
     btn.disabled = true;
-    btn.innerText = "Scanning Packaging Vectors & Structural Boundaries...";
+    btn.innerText = "Analyzing targets & packaging boundaries...";
 
     try {
       const detectPrompt = `
-      You are an automated Intellectual Property & Regulatory Compliance Auditor.
-      Your job is to eliminate ALL triggers that automated copyright, trademark, and ad policy scanners flag on social media (Meta/Facebook).
+      You are an automated Intellectual Property & Trademark Sanitizer.
+      Return SNUG, TIGHT bounding boxes [ymin, xmin, ymax, xmax] (0-1000 integers).
+      CRITICAL: NEVER CREATE OVERSIZED RECTANGLES THAT COVER NON-TRADEMARK BACKGROUND ARTWORK.
 
-      CRITICAL ENFORCEMENT TARGETS:
-      1. Primary & Secondary Brand Names, cursive wordmarks, circular emblems.
-      2. Health, Medical & Viral Claims: 'COVID-19', 'COLD, FLU & VIRUSES', 'KILLS 99.9%', 'SCIENTIFICALLY PROVEN'.
-      3. Registered Sub-Brands & Scent Trademarks: Any word with ™ or ®, e.g. 'ODOR BLASTERS', 'fresh burst™', 'OxiClean'.
-      4. Promotional & Regulatory Claim Strips: Wide claim bands above product footers.
+      EXACT TARGET RULES:
 
-      STAGE 1: GENERATE SNUG BOUNDING BOXES [ymin, xmin, ymax, xmax] (0-1000 INTEGERS):
+      1. MULTI-PACK CANS (e.g. Febreze):
+         - Return a SLIM vertical box for EACH can covering ONLY: cursive brand name + 'AIR' + 'SANITIZER'.
+           * DO NOT cover the empty space between the cans.
+           * Width of each can's box MUST NOT exceed 18% of image width (xmax - xmin <= 180).
+         - Return one slim horizontal strip specifically over the red claim banner directly above '3-PACK'.
+         - Return small slim strips over 'SCIENTIFICALLY PROVEN' at the top of each can.
 
-      1. MULTI-PACK SPRAY CANS (e.g. Febreze 3-Packs):
-         - Return INDIVIDUAL vertical column boxes for EACH can body from collar to footer wrap (covering brand, 'AIR', and 'SANITIZER').
-         - Include the top 'SCIENTIFICALLY PROVEN' collar line.
-         - Return ONE slim horizontal strip specifically over the red claim ribbon above the '3-PACK' wrap.
+      2. JUGS (e.g. Lysol):
+         - Box A (Brand): Diagonal brand logo only.
+         - Box B (Sanitizer): Slim horizontal strip strictly over 'SANITIZER'. Keep 'LAUNDRY' and 'CRISP LINEN SCENT' clean and visible.
+         - Box C (Flank Badge): If a red burst badge is on the left flank, return a box with xmin: 0.
+         - Box D (Collar Claim): The arched 'KILLS COLD, FLU & VIRUSES' text near collar.
 
-      2. LIQUID JUGS & ASYMMETRICAL BOTTLES (e.g. Lysol):
-         - Upper Brand & Neck: From the dark blue collar down over 'KILLS COLD, FLU & COVID-19' and the diagonal brand name.
-         - Sanitizer Line: A dedicated horizontal strip covering 'SANITIZER'. Keep 'LAUNDRY' and 'CRISP LINEN SCENT' clean and visible.
-         - Left Flank Burst: A dedicated box for the red starburst 'KILLS 99.9%' badge on the outer flank with xmin: 0.
+      3. POUCHES (e.g. Arm & Hammer):
+         - Snug circular box over hammer emblem.
+         - Snug box over 'plus OxiClean / ODOR BLASTERS'.
+         - Snug box over 'fresh burst™' in bottom right corner.
 
-      3. POUCHES & PACKS (e.g. Arm & Hammer):
-         - Circular Heritage Logo: Snug box over the circular hammer seal.
-         - Co-Brand Block: Snug box over 'plus OxiClean / ODOR BLASTERS'.
-         - Trademark Scent Badge: Snug box over the 'fresh burst™' corner badge.
-
-      WHITELIST (MUST PRESERVE):
-      - '72 PAKS', '90 FL OZ', '3-PACK 10 Fl.Oz Each', '16 oz'.
-      - Neutral words: 'LAUNDRY', '5 in 1 POWER PAKS', 'Simple Fresh Scent', 'CRISP LINEN SCENT'.
-      - Laundry pods, clothes illustrations, container handles.
+      WHITELIST (NEVER COVER):
+      - 'LAUNDRY', 'CRISP LINEN SCENT', '3-PACK 10 Fl.Oz Each', '72 PAKS', '90 FL OZ', '5 in 1 POWER PAKS', 'Simple Fresh Scent'.
+      - Laundry pods, clothing graphics, jug handles, background negative space.
 
       Return ONLY valid JSON matching this schema:
       {
         "boxes": [[ymin, xmin, ymax, xmax]],
-        "recommended_margin_pct": 12,
-        "suggested_title": "...",
-        "banner_placement_suggestions": ["..."]
+        "suggested_title": "..."
       }
       `;
 
@@ -490,51 +441,22 @@
           temperature: 0.1,
           responseMimeType: "application/json"
         }
-      }, selectedModel);
+      }, activeSelectedModel);
 
       let rawText = detectData.candidates[0]?.content?.parts[0]?.text || "{}";
       rawText = rawText.replace(/```json/g, "").replace(/```/g, "").trim();
-      
-      // Auto-heal truncated JSON
-      if (rawText.lastIndexOf("}") < rawText.lastIndexOf("{")) {
-        rawText += "}";
-      }
+      if (rawText.lastIndexOf("}") < rawText.lastIndexOf("{")) rawText += "}";
 
       let parsed = JSON.parse(rawText);
       rawAiBoxes = Array.isArray(parsed) ? parsed : (parsed.boxes || []);
 
-      if (parsed.recommended_margin_pct) {
-        aiRecommendedMargin = parseFloat(parsed.recommended_margin_pct) / 100;
-        document.getElementById("paddingLabel").textContent = `Mask Margin (Auto: ${parsed.recommended_margin_pct}%)`;
-      } else {
-        aiRecommendedMargin = 0.12;
-      }
-
-      // Display the Operator Compliance Reminder below Upload New Image
       document.getElementById("complianceReminder").style.display = "block";
-
-      renderAllMasks();
+      renderLeftTargetView();
+      renderRightMaskedView();
 
       if (parsed.suggested_title) {
         document.getElementById("suggestedTitle").value = enforceSafeTitle(parsed.suggested_title);
       }
-
-      const bannerBox = document.getElementById("bannerPlacementBox");
-      const bannerList = document.getElementById("bannerGuideList");
-      bannerList.innerHTML = "";
-
-      const suggestions = parsed.banner_placement_suggestions || [];
-      if (suggestions.length > 0) {
-        suggestions.forEach(tip => {
-          const li = document.createElement("li");
-          li.innerHTML = tip;
-          bannerList.appendChild(li);
-        });
-        bannerBox.style.display = "block";
-      } else {
-        bannerBox.style.display = "none";
-      }
-
       document.getElementById("downloadBtn").style.display = "inline-block";
 
     } catch (err) {
@@ -546,54 +468,70 @@
     }
   });
 
-  // Snug expansion with perimeter edge-snapping for flank elements
-  function expandBoxDynamically(box, marginRatio) {
+  // Snug expansion: Prevents ballooning on multi-packs and preserves whitelist text
+  function expandBoxSnug(box) {
     const [ymin, xmin, ymax, xmax] = box;
     const w = xmax - xmin;
     const h = ymax - ymin;
-    
-    const padX = Math.round(w * marginRatio);
-    const padY = Math.round(h * (marginRatio * 0.8));
+
+    // Small, tight padding (5-8% max)
+    const padX = Math.round(w * 0.06);
+    const padY = Math.round(h * 0.06);
 
     let newYmin = Math.max(0, ymin - padY);
     let newXmin = Math.max(0, xmin - padX);
     let newYmax = Math.min(1000, ymax + padY);
     let newXmax = Math.min(1000, xmax + padX);
 
-    // Perimeter Edge Snap: Firmly snap side-flank badges to canvas borders
-    if (xmin <= 130) newXmin = 0;
-    if (xmax >= 870) newXmax = 1000;
-    if (ymin <= 50) newYmin = 0;
+    // Flank edge snap: Only for objects truly on the canvas edge
+    if (xmin <= 90) newXmin = 0;
+    if (xmax >= 910) newXmax = 1000;
+    if (ymin <= 40) newYmin = 0;
 
     return [newYmin, newXmin, newYmax, newXmax];
   }
 
-  function getPackagingScale() {
-    const diag = Math.sqrt(canvas.width * canvas.width + canvas.height * canvas.height);
-    return Math.max(0.6, diag / 1400);
+  // 1. RENDER LEFT CANVAS: Original image + Red Target Rectangles
+  function renderLeftTargetView() {
+    if (!loadedImage) return;
+    tCtx.clearRect(0, 0, targetCanvas.width, targetCanvas.height);
+    tCtx.drawImage(loadedImage, 0, 0);
+
+    if (rawAiBoxes.length === 0) return;
+
+    tCtx.save();
+    tCtx.strokeStyle = "#ef4444";
+    tCtx.lineWidth = 3.5;
+    tCtx.setLineDash([6, 5]);
+
+    rawAiBoxes.forEach(box => {
+      const [ymin, xmin, ymax, xmax] = box;
+      const x = (xmin / 1000) * targetCanvas.width;
+      const y = (ymin / 1000) * targetCanvas.height;
+      const w = ((xmax - xmin) / 1000) * targetCanvas.width;
+      const h = ((ymax - ymin) / 1000) * targetCanvas.height;
+
+      tCtx.strokeRect(x, y, w, h);
+    });
+    tCtx.restore();
   }
 
-  function renderAllMasks() {
+  // 2. RENDER RIGHT CANVAS: Clean Frosted Output (Interactive manual touchups)
+  function renderRightMaskedView() {
     if (!loadedImage) return;
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.clearRect(0, 0, outputCanvas.width, outputCanvas.height);
     ctx.drawImage(loadedImage, 0, 0);
 
     const mode = document.getElementById("maskMode").value;
-    const paddingVal = document.getElementById("paddingSelect").value;
-    const paddingRatio = paddingVal === "auto" ? aiRecommendedMargin : parseFloat(paddingVal);
-    const showRedBoxes = document.getElementById("showRedBoxesSelect").value === "true";
-
-    const processedBoxes = rawAiBoxes.map(b => expandBoxDynamically(b, paddingRatio));
+    const processedBoxes = rawAiBoxes.map(b => expandBoxSnug(b));
     const allBoxes = [...processedBoxes, ...manualBoxes];
 
-    // 1. Draw Sanitization Diffusion Masks
     allBoxes.forEach(box => {
       const [ymin, xmin, ymax, xmax] = box;
-      const x = (xmin / 1000) * canvas.width;
-      const y = (ymin / 1000) * canvas.height;
-      const w = ((xmax - xmin) / 1000) * canvas.width;
-      const h = ((ymax - ymin) / 1000) * canvas.height;
+      const x = (xmin / 1000) * outputCanvas.width;
+      const y = (ymin / 1000) * outputCanvas.height;
+      const w = ((xmax - xmin) / 1000) * outputCanvas.width;
+      const h = ((ymax - ymin) / 1000) * outputCanvas.height;
 
       if (mode === "ambient") {
         applyAmbientBlock(x, y, w, h);
@@ -606,37 +544,16 @@
       }
     });
 
-    // 2. DRAW RED RECTANGULAR HOLLOW TARGET BOXES (If Audit Mode is On)
-    if (showRedBoxes && rawAiBoxes.length > 0) {
-      ctx.save();
-      ctx.strokeStyle = "#ef4444";
-      ctx.lineWidth = 2.5;
-      ctx.setLineDash([5, 4]);
-
-      rawAiBoxes.forEach(box => {
-        const [ymin, xmin, ymax, xmax] = box;
-        const x = (xmin / 1000) * canvas.width;
-        const y = (ymin / 1000) * canvas.height;
-        const w = ((xmax - xmin) / 1000) * canvas.width;
-        const h = ((ymax - ymin) / 1000) * canvas.height;
-
-        ctx.strokeRect(x, y, w, h);
-      });
-      ctx.restore();
-    }
-
     document.getElementById("downloadBtn").style.display = "inline-block";
   }
 
-  // Scale-Invariant Radial Diffusion with High Opacity & Clamped Feathering
   function applyFrostedDiffusion(x, y, w, h, isBorderSnapped = false) {
     if (w <= 0 || h <= 0) return;
     const rw = Math.max(1, Math.round(w));
     const rh = Math.max(1, Math.round(h));
 
-    const scaleFactor = getPackagingScale();
-    const dynamicBlur = Math.max(24, Math.round(32 * scaleFactor));
-    const pad = Math.round(dynamicBlur * 1.2);
+    const dynamicBlur = Math.max(20, Math.round(28 * (outputCanvas.width / 1400)));
+    const pad = Math.round(dynamicBlur * 1.1);
 
     const srcX = Math.max(0, x - pad);
     const srcY = Math.max(0, y - pad);
@@ -648,12 +565,12 @@
     off.height = srcH;
     const offCtx = off.getContext("2d");
 
-    // Sample dominant packaging tone
+    // Dominant background sampling
     const sampleCanvas = document.createElement("canvas");
     sampleCanvas.width = 1;
     sampleCanvas.height = 1;
     const sCtx = sampleCanvas.getContext("2d");
-    sCtx.drawImage(loadedImage, x, y, rw, Math.max(2, Math.round(rh * 0.30)), 0, 0, 1, 1);
+    sCtx.drawImage(loadedImage, x, y, rw, Math.max(2, Math.round(rh * 0.35)), 0, 0, 1, 1);
     let [r, g, b] = sCtx.getImageData(0, 0, 1, 1).data;
 
     const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
@@ -663,7 +580,7 @@
       b = Math.min(240, b + 60);
     }
 
-    // Scramble character typography vectors
+    // Scramble underlying typography vectors
     const scale = 0.02;
     const mini = document.createElement("canvas");
     mini.width = Math.max(2, Math.floor(srcW * scale));
@@ -675,8 +592,8 @@
     offCtx.drawImage(mini, 0, 0, mini.width, mini.height, 0, 0, srcW, srcH);
     offCtx.imageSmoothingEnabled = true;
 
-    // High-opacity underlay to prevent white typography bleed
-    offCtx.fillStyle = `rgba(${r}, ${g}, ${b}, 0.88)`;
+    // High opacity wash (0.86) to prevent high-contrast white letter cut-through
+    offCtx.fillStyle = `rgba(${r}, ${g}, ${b}, 0.86)`;
     offCtx.fillRect(0, 0, srcW, srcH);
 
     const blurCanvas = document.createElement("canvas");
@@ -700,9 +617,7 @@
     maskCanvas.height = rh;
     const mCtx = maskCanvas.getContext("2d");
 
-    const maxFeather = Math.min(rw, rh) < 40 ? 2 : 8;
-    const feather = Math.max(1, Math.min(maxFeather, Math.round(Math.min(rw, rh) * 0.08)));
-
+    const feather = Math.max(1, Math.min(6, Math.round(Math.min(rw, rh) * 0.08)));
     mCtx.fillStyle = "#ffffff";
     if (isBorderSnapped) {
       mCtx.fillRect(0, 0, rw - feather, rh);
@@ -724,33 +639,28 @@
   }
 
   function applyAmbientBlock(x, y, w, h) {
-    if (w <= 0 || h <= 0) return;
     const rw = Math.max(1, Math.round(w));
     const rh = Math.max(1, Math.round(h));
-
     const sampleCanvas = document.createElement("canvas");
     sampleCanvas.width = 4;
     sampleCanvas.height = 4;
     const sCtx = sampleCanvas.getContext("2d");
     sCtx.drawImage(loadedImage, x, y, rw, rh, 0, 0, 4, 4);
 
-    const pad = Math.round(24 * getPackagingScale());
-    const offW = rw + pad * 2;
-    const offH = rh + pad * 2;
+    const pad = Math.round(20 * (outputCanvas.width / 1400));
     const off = document.createElement("canvas");
-    off.width = offW;
-    off.height = offH;
+    off.width = rw + pad * 2;
+    off.height = rh + pad * 2;
     const offCtx = off.getContext("2d");
 
     offCtx.imageSmoothingEnabled = true;
-    offCtx.imageSmoothingQuality = "high";
-    offCtx.drawImage(sampleCanvas, 0, 0, 4, 4, 0, 0, offW, offH);
+    offCtx.drawImage(sampleCanvas, 0, 0, 4, 4, 0, 0, off.width, off.height);
 
     const blurCanvas = document.createElement("canvas");
-    blurCanvas.width = offW;
-    blurCanvas.height = offH;
+    blurCanvas.width = off.width;
+    blurCanvas.height = off.height;
     const bCtx = blurCanvas.getContext("2d");
-    bCtx.filter = `blur(${Math.round(22 * getPackagingScale())}px)`;
+    bCtx.filter = `blur(${Math.round(20 * (outputCanvas.width / 1400))}px)`;
     bCtx.drawImage(off, 0, 0);
 
     ctx.save();
@@ -759,13 +669,11 @@
   }
 
   function applyPixelation(x, y, w, h) {
-    const scale = 0.035;
     const off = document.createElement("canvas");
-    off.width = Math.max(1, Math.floor(w * scale));
-    off.height = Math.max(1, Math.floor(h * scale));
+    off.width = Math.max(1, Math.floor(w * 0.035));
+    off.height = Math.max(1, Math.floor(h * 0.035));
     const offCtx = off.getContext("2d");
-
-    offCtx.drawImage(canvas, x, y, w, h, 0, 0, off.width, off.height);
+    offCtx.drawImage(outputCanvas, x, y, w, h, 0, 0, off.width, off.height);
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(off, 0, 0, off.width, off.height, x, y, w, h);
     ctx.imageSmoothingEnabled = true;
@@ -779,16 +687,17 @@
   }
 
   function getCanvasCoords(evt) {
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
+    const rect = outputCanvas.getBoundingClientRect();
+    const scaleX = outputCanvas.width / rect.width;
+    const scaleY = outputCanvas.height / rect.height;
     return {
       x: (evt.clientX - rect.left) * scaleX,
       y: (evt.clientY - rect.top) * scaleY
     };
   }
 
-  canvas.addEventListener("mousedown", (e) => {
+  // Interactive dragging directly on the Right Preview Canvas
+  outputCanvas.addEventListener("mousedown", (e) => {
     if (!loadedImage) return;
     isDragging = true;
     const pt = getCanvasCoords(e);
@@ -796,10 +705,10 @@
     dragStartY = pt.y;
   });
 
-  canvas.addEventListener("mousemove", (e) => {
+  outputCanvas.addEventListener("mousemove", (e) => {
     if (!isDragging) return;
     const pt = getCanvasCoords(e);
-    renderAllMasks();
+    renderRightMaskedView();
 
     ctx.save();
     ctx.strokeStyle = "#38bdf8";
@@ -809,7 +718,7 @@
     ctx.restore();
   });
 
-  canvas.addEventListener("mouseup", (e) => {
+  outputCanvas.addEventListener("mouseup", (e) => {
     if (!isDragging) return;
     isDragging = false;
     const pt = getCanvasCoords(e);
@@ -821,13 +730,13 @@
 
     if (x2 - x1 > 8 && y2 - y1 > 8) {
       manualBoxes.push([
-        Math.round((y1 / canvas.height) * 1000),
-        Math.round((x1 / canvas.width) * 1000),
-        Math.round((y2 / canvas.height) * 1000),
-        Math.round((x2 / canvas.width) * 1000)
+        Math.round((y1 / outputCanvas.height) * 1000),
+        Math.round((x1 / outputCanvas.width) * 1000),
+        Math.round((y2 / outputCanvas.height) * 1000),
+        Math.round((x2 / outputCanvas.width) * 1000)
       ]);
     }
-    renderAllMasks();
+    renderRightMaskedView();
   });
 
   document.getElementById("copyTitleBtn").addEventListener("click", () => {
@@ -842,8 +751,7 @@
       initialModel,
       "gemini-2.5-flash-lite",
       "gemini-2.0-flash-lite",
-      "gemini-1.5-flash-8b",
-      "gemini-flash-latest"
+      "gemini-1.5-flash-8b"
     ].filter((v, i, a) => v && a.indexOf(v) === i);
 
     let lastError = null;
@@ -868,22 +776,14 @@
         continue;
       }
     }
-    throw lastError || new Error("All active Gemini models failed.");
+    throw lastError || new Error("All candidate Lite models failed.");
   }
 
-  // Final Download Image automatically hides red debug outlines prior to export
   document.getElementById("downloadBtn").addEventListener("click", () => {
-    const originalSetting = document.getElementById("showRedBoxesSelect").value;
-    document.getElementById("showRedBoxesSelect").value = "false";
-    renderAllMasks();
-
     const link = document.createElement("a");
     link.download = "sanitized-deal-asset.png";
-    link.href = canvas.toDataURL("image/png");
+    link.href = outputCanvas.toDataURL("image/png");
     link.click();
-
-    document.getElementById("showRedBoxesSelect").value = originalSetting;
-    renderAllMasks();
   });
 </script>
 </body>
