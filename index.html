@@ -573,71 +573,86 @@
   }
 
   function applyFrostedDiffusion(x, y, w, h) {
-    if (w <= 0 || h <= 0) return;
-    const rw = Math.max(1, Math.round(w));
-    const rh = Math.max(1, Math.round(h));
+  if (w <= 0 || h <= 0) return;
+  const rw = Math.max(1, Math.round(w));
+  const rh = Math.max(1, Math.round(h));
 
-    const pad = 35;
-    const srcX = Math.max(0, x - pad);
-    const srcY = Math.max(0, y - pad);
-    const srcW = Math.min(loadedImage.naturalWidth - srcX, rw + pad * 2);
-    const srcH = Math.min(loadedImage.naturalHeight - srcY, rh + pad * 2);
+  // Dynamic blur calculation based on packaging scale (scales up for 1500px+ images)
+  const dynamicBlur = Math.max(35, Math.round(Math.min(canvas.width, canvas.height) * 0.04));
+  const pad = Math.round(dynamicBlur * 1.2);
 
-    const off = document.createElement("canvas");
-    off.width = srcW;
-    off.height = srcH;
-    const offCtx = off.getContext("2d");
+  const srcX = Math.max(0, x - pad);
+  const srcY = Math.max(0, y - pad);
+  const srcW = Math.min(loadedImage.naturalWidth - srcX, rw + pad * 2);
+  const srcH = Math.min(loadedImage.naturalHeight - srcY, rh + pad * 2);
 
-    const scale = 0.06;
-    const mini = document.createElement("canvas");
-    mini.width = Math.max(1, Math.floor(srcW * scale));
-    mini.height = Math.max(1, Math.floor(srcH * scale));
-    const miniCtx = mini.getContext("2d");
-    miniCtx.drawImage(loadedImage, srcX, srcY, srcW, srcH, 0, 0, mini.width, mini.height);
+  const off = document.createElement("canvas");
+  off.width = srcW;
+  off.height = srcH;
+  const offCtx = off.getContext("2d");
 
-    offCtx.imageSmoothingEnabled = false;
-    offCtx.drawImage(mini, 0, 0, mini.width, mini.height, 0, 0, srcW, srcH);
-    offCtx.imageSmoothingEnabled = true;
+  // Step 1: Neutralize letter contrast by blending a solid base tint from the local pixels
+  const sampleCanvas = document.createElement("canvas");
+  sampleCanvas.width = 1;
+  sampleCanvas.height = 1;
+  const sCtx = sampleCanvas.getContext("2d");
+  sCtx.drawImage(loadedImage, x, y, rw, rh, 0, 0, 1, 1);
+  const [r, g, b] = sCtx.getImageData(0, 0, 1, 1).data;
 
-    const blurCanvas = document.createElement("canvas");
-    blurCanvas.width = srcW;
-    blurCanvas.height = srcH;
-    const bCtx = blurCanvas.getContext("2d");
-    bCtx.filter = "blur(28px)";
-    bCtx.drawImage(off, 0, 0);
+  // Step 2: Aggressive pixel scrambling (destroying letter vectors completely)
+  const scale = 0.025; // Drastically drops resolution so characters cannot survive
+  const mini = document.createElement("canvas");
+  mini.width = Math.max(2, Math.floor(srcW * scale));
+  mini.height = Math.max(2, Math.floor(srcH * scale));
+  const miniCtx = mini.getContext("2d");
+  miniCtx.drawImage(loadedImage, srcX, srcY, srcW, srcH, 0, 0, mini.width, mini.height);
 
-    const offsetX = x - srcX;
-    const offsetY = y - srcY;
+  // Paint the scrambled pixels
+  offCtx.imageSmoothingEnabled = false;
+  offCtx.drawImage(mini, 0, 0, mini.width, mini.height, 0, 0, srcW, srcH);
+  offCtx.imageSmoothingEnabled = true;
 
-    const patchCanvas = document.createElement("canvas");
-    patchCanvas.width = rw;
-    patchCanvas.height = rh;
-    const pCtx = patchCanvas.getContext("2d");
-    pCtx.drawImage(blurCanvas, offsetX, offsetY, rw, rh, 0, 0, rw, rh);
+  // Overlay a 45% tint of the package's dominant local color to eliminate white-letter punch-through
+  offCtx.fillStyle = `rgba(${r}, ${g}, ${b}, 0.45)`;
+  offCtx.fillRect(0, 0, srcW, srcH);
 
-    const maskCanvas = document.createElement("canvas");
-    maskCanvas.width = rw;
-    maskCanvas.height = rh;
-    const mCtx = maskCanvas.getContext("2d");
+  // Step 3: Deep Gaussian blur pass
+  const blurCanvas = document.createElement("canvas");
+  blurCanvas.width = srcW;
+  blurCanvas.height = srcH;
+  const bCtx = blurCanvas.getContext("2d");
+  bCtx.filter = `blur(${dynamicBlur}px)`;
+  bCtx.drawImage(off, 0, 0);
 
-    const grad = mCtx.createRadialGradient(
-      rw / 2, rh / 2, Math.min(rw, rh) * 0.2,
-      rw / 2, rh / 2, Math.max(rw, rh) * 0.5
-    );
-    grad.addColorStop(0, "rgba(255, 255, 255, 1.0)");
-    grad.addColorStop(0.7, "rgba(255, 255, 255, 0.85)");
-    grad.addColorStop(1, "rgba(255, 255, 255, 0.0)");
+  const offsetX = x - srcX;
+  const offsetY = y - srcY;
 
-    mCtx.fillStyle = grad;
-    mCtx.fillRect(0, 0, rw, rh);
+  // Step 4: True solid-core feathering (100% opaque across 75% of the box, soft outer feather)
+  const patchCanvas = document.createElement("canvas");
+  patchCanvas.width = rw;
+  patchCanvas.height = rh;
+  const pCtx = patchCanvas.getContext("2d");
+  pCtx.drawImage(blurCanvas, offsetX, offsetY, rw, rh, 0, 0, rw, rh);
 
-    pCtx.globalCompositeOperation = "destination-in";
-    pCtx.drawImage(maskCanvas, 0, 0);
+  const maskCanvas = document.createElement("canvas");
+  maskCanvas.width = rw;
+  maskCanvas.height = rh;
+  const mCtx = maskCanvas.getContext("2d");
 
-    ctx.save();
-    ctx.drawImage(patchCanvas, x, y);
-    ctx.restore();
-  }
+  // Keep feather tight to the perimeter so the core never leaks typography
+  const feather = Math.max(8, Math.round(Math.min(rw, rh) * 0.12));
+  mCtx.fillStyle = "#ffffff";
+  mCtx.fillRect(feather, feather, rw - feather * 2, rh - feather * 2);
+  mCtx.filter = `blur(${feather}px)`;
+  mCtx.drawImage(maskCanvas, 0, 0);
+
+  pCtx.globalCompositeOperation = "destination-in";
+  pCtx.drawImage(maskCanvas, 0, 0);
+
+  ctx.save();
+  ctx.drawImage(patchCanvas, x, y);
+  ctx.restore();
+}
 
   function applyAmbientBlock(x, y, w, h) {
     if (w <= 0 || h <= 0) return;
