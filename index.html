@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Deal Sanitizer & Auto-Masker v1.0.20</title>
+  <title>Deal Sanitizer & Auto-Masker v1.0.21</title>
   <style>
     body { 
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
@@ -98,13 +98,13 @@
 </head>
 <body>
 
-<div class="app-version-fixed">v1.0.20</div>
+<div class="app-version-fixed">v1.0.21</div>
 
 <div class="container">
   <div class="card full-width">
     <h2>
       Automated Deal Asset Sanitizer 
-      <span class="version-header-badge">v1.0.20</span>
+      <span class="version-header-badge">v1.0.21</span>
     </h2>
     
     <label>Gemini API Key</label>
@@ -134,7 +134,7 @@
 
     <label>Masking Visual Style</label>
     <select id="maskMode">
-      <option value="blur" selected>Zero-Leak Frosted Blur (100% Solid-Base)</option>
+      <option value="blur" selected>Zero-Leak Frosted Blur (4x4 Gradient Block)</option>
       <option value="pixelate">Mosaic Pixelation</option>
       <option value="solid">Clean Dark Tape</option>
     </select>
@@ -224,16 +224,17 @@
     localStorage.setItem("deal_gemini_key", keyInput.value.trim());
   });
 
+  // Strict Programmatic Title Sanitizer with Deduplication
   function enforceSafeTitle(rawTitle) {
     if (!rawTitle) return "";
     let safe = rawTitle;
     const rules = [
       [/\baussie\b/gi, ""],
-      [/\bfresh\s+burst\b/gi, "Fresh Scent"],
-      [/\bclean\s+breeze\b/gi, "Fresh Scent"],
-      [/\bmountain\s+spring\b/gi, "Fresh Scent"],
-      [/\bmeadow\s+fresh\b/gi, "Fresh Scent"],
-      [/\boriginal\s+fresh\b/gi, "Fresh Scent"],
+      [/\bfresh\s+burst(\s+scent)?\b/gi, "Fresh Scent"],
+      [/\bclean\s+breeze(\s+scent)?\b/gi, "Fresh Scent"],
+      [/\bmountain\s+spring(\s+scent)?\b/gi, "Fresh Scent"],
+      [/\bmeadow\s+fresh(\s+scent)?\b/gi, "Fresh Scent"],
+      [/\boriginal\s+fresh(\s+scent)?\b/gi, "Fresh Scent"],
       [/\b(laundry\s+)?sanitizer\b/gi, "Fabric Refresher"],
       [/\bhand\s+sanitizer\b/gi, "Hand Cleanser"],
       [/\bsanitizer\b/gi, "Refresher"],
@@ -249,6 +250,9 @@
     rules.forEach(([regex, replacement]) => {
       safe = safe.replace(regex, replacement);
     });
+
+    // Remove duplicated consecutive words (e.g., "Scent Scent" -> "Scent")
+    safe = safe.replace(/\b(\w+)\s+\1\b/gi, "$1");
     return safe.replace(/\s+/g, " ").trim();
   }
 
@@ -321,7 +325,7 @@
 
     const btn = document.getElementById("processBtn");
     btn.disabled = true;
-    btn.innerText = "Analyzing Surfaces & Trademarks...";
+    btn.innerText = "Analyzing Surfaces & Clusters...";
 
     try {
       const detectPrompt = `
@@ -330,13 +334,13 @@
       TASK 1: COMPLETE VISUAL BOUNDING BOXES (DETERMINISTIC ANCHORS)
       Scan the ENTIRE packaging surface. Return normalized coordinates [ymin, xmin, ymax, xmax] (0 to 1000 integers) covering:
       
-      1. CRITICAL: BRAND NAMES VS. BENEFIT WORDS
+      1. PRIMARY BRAND NAMES & MASCOTS:
          - DO MASK: All primary brand names, mascots, and logos ('aussie', kangaroo silhouette, 'Arm & Hammer', 'Clorox', 'Lysol'). Look closely for subtle, low-contrast, or tone-on-tone brand typography on bottle shoulders.
-         - NEVER MASK: Generic product descriptors or benefits ('MOIST', 'SHAMPOO', 'CONDITIONER', 'DETANGLER', 'POWER PAKS', '5 in 1').
+         - NEVER MASK: Generic product descriptors ('MOIST', 'SHAMPOO', 'CONDITIONER', 'DETANGLER', 'POWER PAKS', '5 in 1').
       
-      2. SECONDARY TRADEMARKS & SCENT TAGLINES (MANDATORY):
-         - Co-brands & secondary logos: 'OxiClean', 'ODOR BLASTERS', 'stain fighters', 'Febreze'. The bounding box over middle banners MUST extend all the way horizontally through 'ODOR BLASTERS'.
-         - Trademarked scent badges carrying ™ or ®: e.g., 'fresh burst™' in the lower corner MUST be masked with its own box.
+      2. HORIZONTAL BANNER CLUSTER EXPANSION (CRITICAL):
+         - Co-brands & secondary banners: e.g., 'OxiClean' + 'ODOR BLASTERS'. The bounding box over middle banners MUST extend horizontally across all stacked or slanted sub-brand text ('ODOR BLASTERS', 'stain fighters') completely through the rightmost edge. Do not clip early at 'OxiClean'.
+         - Scent Badges: Always return a bounding box for lower corner scent badges marked with ™ or ® ('fresh burst™').
       
       3. PHYSICAL LANDMARKS & EMBLEMS:
          - Circular emblems (e.g. Arm & Hammer crest): Mask must swallow the ENTIRE colored outer ring and radial burst perimeter.
@@ -403,7 +407,7 @@
       list.innerHTML = "";
 
       const defaultTip = document.createElement("li");
-      defaultTip.innerHTML = `<b>Zero-Leak Underwrite Active:</b> Bounding boxes overwrite base image data with solid color fills to prevent alpha transparency leaks.`;
+      defaultTip.innerHTML = `<b>Zero-Glyph Pipeline Active:</b> 4x4 low-frequency gradient destroys character stems while retaining natural bottle lighting.`;
       list.appendChild(defaultTip);
 
       if (parsed.suggestions && Array.isArray(parsed.suggestions)) {
@@ -511,48 +515,44 @@
     document.getElementById("downloadBtn").style.display = "inline-block";
   }
 
-  // 100% Opaque Solid-Base Frosted Blur Pipeline
+  // 100% Opaque 4x4 Bilinear Gradient Pipeline
   function applyZeroLeakBlur(x, y, w, h) {
     if (w <= 0 || h <= 0) return;
     const rw = Math.max(1, Math.round(w));
     const rh = Math.max(1, Math.round(h));
 
-    // 1. Calculate 100% solid, fully opaque color from local packaging area
-    const avgCanvas = document.createElement("canvas");
-    avgCanvas.width = 1;
-    avgCanvas.height = 1;
-    const avgCtx = avgCanvas.getContext("2d");
-    avgCtx.drawImage(loadedImage, x, y, rw, rh, 0, 0, 1, 1);
-    const p = avgCtx.getImageData(0, 0, 1, 1).data;
-    const solidColor = `rgb(${p[0]}, ${p[1]}, ${p[2]})`;
+    // 1. Extreme 4x4 Downsample: Mathematically destroys letter strokes into ambient light values
+    const sampleCanvas = document.createElement("canvas");
+    sampleCanvas.width = 4;
+    sampleCanvas.height = 4;
+    const sCtx = sampleCanvas.getContext("2d");
+    sCtx.drawImage(loadedImage, x, y, rw, rh, 0, 0, 4, 4);
 
+    // 2. Offscreen buffer with internal margin to prevent Gaussian edge feathering
+    const pad = 24;
+    const offW = rw + pad * 2;
+    const offH = rh + pad * 2;
+    const off = document.createElement("canvas");
+    off.width = offW;
+    off.height = offH;
+    const offCtx = off.getContext("2d");
+
+    // Bilinear upscale of the 4x4 grid across the buffer
+    offCtx.imageSmoothingEnabled = true;
+    offCtx.imageSmoothingQuality = "high";
+    offCtx.drawImage(sampleCanvas, 0, 0, 4, 4, 0, 0, offW, offH);
+
+    // 3. Smooth the bilinear gradient with Gaussian blur
+    const blurCanvas = document.createElement("canvas");
+    blurCanvas.width = offW;
+    blurCanvas.height = offH;
+    const bCtx = blurCanvas.getContext("2d");
+    bCtx.filter = "blur(20px)";
+    bCtx.drawImage(off, 0, 0);
+
+    // 4. Overwrite base canvas at [x, y, rw, rh] (100% opaque, zero alpha bleed)
     ctx.save();
-
-    // 2. OBLITERATE: Overwrite the target area on the main canvas with solid color.
-    // This physically erases the underlying typography so 0% text can show through.
-    ctx.fillStyle = solidColor;
-    ctx.fillRect(x, y, rw, rh);
-
-    // 3. Build a low-frequency 12-sample mosaic from the source to capture lighting/gradients
-    const blockW = Math.max(3, Math.floor(rw / 12));
-    const blockH = Math.max(3, Math.floor(rh / 12));
-    const mosaic = document.createElement("canvas");
-    mosaic.width = blockW;
-    mosaic.height = blockH;
-    const mCtx = mosaic.getContext("2d");
-    mCtx.drawImage(loadedImage, x, y, rw, rh, 0, 0, blockW, blockH);
-
-    // 4. Bilinear upscale the mosaic over the solid fill
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = "high";
-    ctx.globalAlpha = 0.85;
-    ctx.drawImage(mosaic, 0, 0, blockW, blockH, x, y, rw, rh);
-
-    // 5. Heavy Gaussian blur pass strictly over the target rectangle
-    ctx.filter = "blur(14px)";
-    ctx.globalAlpha = 0.95;
-    ctx.drawImage(canvas, x, y, rw, rh, x, y, rw, rh);
-
+    ctx.drawImage(blurCanvas, pad, pad, rw, rh, x, y, rw, rh);
     ctx.restore();
   }
 
