@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Deal Sanitizer & Auto-Masker v1.0.11</title>
+  <title>Deal Sanitizer & Auto-Masker v1.0.12</title>
   <style>
     body { 
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
@@ -98,13 +98,13 @@
 </head>
 <body>
 
-<div class="app-version-fixed">v1.0.11</div>
+<div class="app-version-fixed">v1.0.12</div>
 
 <div class="container">
   <div class="card full-width">
     <h2>
       Automated Deal Asset Sanitizer 
-      <span class="version-header-badge">v1.0.11</span>
+      <span class="version-header-badge">v1.0.12</span>
     </h2>
     
     <label>Gemini API Key</label>
@@ -141,13 +141,14 @@
 
     <div class="grid-2col">
       <div>
-        <label>Mask Margin (Padding)</label>
+        <label id="paddingLabel">Mask Margin (Padding)</label>
         <select id="paddingSelect">
-          <option value="0.10">Tight (10%)</option>
-          <option value="0.15" selected>Standard (15% - Recommended)</option>
-          <option value="0.20">Generous (20%)</option>
-          <option value="0.25">Wide (25%)</option>
-          <option value="0.35">Maximum (35%)</option>
+          <option value="auto" selected>Auto (AI-Selected: 10%–20%)</option>
+          <option value="0.10">10%</option>
+          <option value="0.125">12.5%</option>
+          <option value="0.15">15%</option>
+          <option value="0.175">17.5%</option>
+          <option value="0.20">20%</option>
         </select>
       </div>
       <div>
@@ -206,6 +207,7 @@
 
   let rawAiBoxes = [];
   let manualBoxes = [];
+  let aiRecommendedMargin = 0.15; // Fallback default 15%
 
   let isDragging = false;
   let dragStartX = 0;
@@ -222,7 +224,6 @@
     localStorage.setItem("deal_gemini_key", keyInput.value.trim());
   });
 
-  // Programmatic Title Sanitizer
   function enforceSafeTitle(rawTitle) {
     if (!rawTitle) return "";
     let safe = rawTitle;
@@ -282,6 +283,7 @@
     document.getElementById("suggestedTitle").value = "";
     document.getElementById("posterSuggestions").style.display = "none";
     document.getElementById("downloadBtn").style.display = "none";
+    document.getElementById("paddingLabel").textContent = "Mask Margin (Padding)";
     
     const fileInput = document.getElementById("imageInput");
     fileInput.value = "";
@@ -313,32 +315,39 @@
 
     const btn = document.getElementById("processBtn");
     btn.disabled = true;
-    btn.innerText = "Analyzing All Surfaces & Claims...";
+    btn.innerText = "Scanning & Calculating Padding...";
 
     try {
       const detectPrompt = `
       Examine this product packaging for automated affiliate compliance.
 
       TASK 1: COMPLETE VISUAL BOUNDING BOXES
-      Scan the ENTIRE packaging, including lower banners, central artwork, and internal product illustrations (e.g. clothing graphics, vignettes).
+      Scan the ENTIRE packaging, including lower banners, central artwork, and internal product illustrations.
       Return normalized coordinates [ymin, xmin, ymax, xmax] (0 to 1000 integers) covering:
-      1. All primary brand logos and emblems (e.g., Clorox, Lysol).
-      2. All secondary brand names embedded within illustrations, callout badges, or label text (e.g., embedded 'CLOROX' words on graphic icons or banner strips).
-      3. All health/medical claims and pathogen triggers ('BACTERIA', 'VIRUSES', 'SANITIZER', 'DISINFECTANT', 'ODORS & BACTERIA', 'GERMS', 'KILLING 99.9%').
-      4. Any pathogen illustrations (spiky balls, virus shapes).
+      1. Primary brand logos, emblems, and crest arches.
+      2. Secondary brand names embedded within illustrations or badges (e.g. 'CLOROX', 'OxiClean', 'Febreze').
+      3. Health/medical claims and pathogen triggers ('BACTERIA', 'VIRUSES', 'SANITIZER', 'DISINFECTANT', 'ODORS & BACTERIA', 'GERMS', 'KILLING 99.9%').
+      4. Pathogen illustrations (spiky balls, virus shapes).
 
-      TASK 2: COMPLIANT GENERIC TITLE
+      TASK 2: PACKAGING GEOMETRY & RECOMMENDED MARGIN
+      Evaluate packaging geometry (flat pouch vs. curved aerosol can vs. contoured dispenser bottle).
+      Select the best margin percentage from: [10, 12.5, 15, 17.5, 20].
+      - Use 10%–12.5% for flat rectangular boxes or tubs where wide margins bleed onto plain backgrounds.
+      - Use 15%–17.5% for curved bottles, neck tapers, or circular crest logos where arched text sits along slopes.
+      - Use 20% for heavily contoured surfaces or high-contrast crest outlines.
+
+      TASK 3: COMPLIANT GENERIC TITLE
       Generate a brand-free and claim-free title based on fluid ounces/count, scent, and form factor.
-      STRICT FORBIDDEN WORDS: Do NOT use brand names OR restricted terms like "Sanitizer", "Disinfectant", "Antibacterial", "Bleach".
-      MANDATORY REPLACEMENT: Replace "Sanitizer" with "Fabric Refresher", "Laundry Rinse", or "Odor Eliminator".
-      Example format: "90 fl oz Crisp Linen Laundry Fabric Refresher"
+      FORBIDDEN: Never use brand names or terms like "Sanitizer", "Disinfectant", "Antibacterial", "Bleach".
+      REPLACEMENT: Replace "Sanitizer" with "Fabric Refresher", "Laundry Rinse", or "Odor Eliminator".
 
-      TASK 3: POSTER SUGGESTIONS
+      TASK 4: POSTER SUGGESTIONS
       Provide 2 brief tips for the affiliate poster.
 
       Return JSON:
       {
         "boxes": [[ymin, xmin, ymax, xmax]],
+        "recommended_margin_pct": 15,
         "suggested_title": "...",
         "suggestions": ["...", "..."]
       }
@@ -358,6 +367,15 @@
       let parsed = JSON.parse(rawText);
 
       rawAiBoxes = Array.isArray(parsed) ? parsed : (parsed.boxes || []);
+
+      // Parse AI-recommended margin
+      if (parsed.recommended_margin_pct) {
+        aiRecommendedMargin = parseFloat(parsed.recommended_margin_pct) / 100;
+        document.getElementById("paddingLabel").textContent = `Mask Margin (Auto: ${parsed.recommended_margin_pct}%)`;
+      } else {
+        aiRecommendedMargin = 0.15;
+      }
+
       renderAllMasks();
 
       if (parsed.suggested_title) {
@@ -369,7 +387,7 @@
       list.innerHTML = "";
 
       const defaultTip = document.createElement("li");
-      defaultTip.innerHTML = `<b>Illustration Check:</b> Ensure secondary brand text printed over clothing or background artwork is completely concealed.`;
+      defaultTip.innerHTML = `<b>Adaptive Geometry:</b> AI applied <b>${(aiRecommendedMargin * 100).toFixed(1)}%</b> margin padding based on packaging curvature.`;
       list.appendChild(defaultTip);
 
       if (parsed.suggestions && Array.isArray(parsed.suggestions)) {
@@ -446,7 +464,8 @@
     ctx.drawImage(loadedImage, 0, 0);
 
     const mode = document.getElementById("maskMode").value;
-    const paddingRatio = parseFloat(document.getElementById("paddingSelect").value);
+    const paddingVal = document.getElementById("paddingSelect").value;
+    const paddingRatio = paddingVal === "auto" ? aiRecommendedMargin : parseFloat(paddingVal);
     const shouldMerge = document.getElementById("mergeSelect").value === "true";
 
     let processedBoxes = rawAiBoxes.map(b => expandBox(b, paddingRatio));
