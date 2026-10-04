@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Deal Sanitizer & Auto-Masker v1.2.17</title>
+  <title>Deal Sanitizer & Auto-Masker v1.2.18</title>
   <style>
     body { 
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
@@ -98,13 +98,13 @@
 </head>
 <body>
 
-<div class="app-version-fixed">v1.2.17</div>
+<div class="app-version-fixed">v1.2.18</div>
 
 <div class="container">
   <div class="card full-width">
     <h2>
       Automated Deal Asset Sanitizer 
-      <span class="version-header-badge">v1.2.17</span>
+      <span class="version-header-badge">v1.2.18</span>
     </h2>
     
     <label>Gemini API Key</label>
@@ -431,22 +431,19 @@
       STAGE 2: VISUAL BOUNDING BOXES (MULTI-BOX PHYSICAL ANCHORING)
       Return normalized coordinates [ymin, xmin, ymax, xmax] (integers 0 to 1000). Ensure ZERO residual brand ink or claim text peeks through:
 
-      1. MULTI-PACK SPRAY CANS (e.g., Febreze, Air Wick):
-         - Vertical Column Masks for EACH Can:
-           * ymin: MUST start directly below the plastic spray trigger/nozzle hood, fully engulfing any top claim lines such as 'SCIENTIFICALLY PROVEN'.
-           * ymax: Must extend down to touch the bottom multipack footer wrap.
-           * Enclose the central cursive brand script, 'AIR', and 'SANITIZER' completely.
-         - Lateral Edge Extensions: The outermost flanks of Can 1 (left) and Can 3 (right) must fully enclose trailing flourishes (such as the letter 'e') and side label curves.
-         - Bottom Claim Strip: Return a dedicated wide horizontal strip covering the red 'Eliminates Odors by Killing 99.9%...' banner immediately above the '3-PACK' wrap.
+      1. MULTI-PACK SPRAY CANS:
+         - Return an INDIVIDUAL vertical bounding box for EACH spray can.
+         - Top (ymin): Directly beneath the nozzle spray hood.
+         - Bottom (ymax): Must extend ALL THE WAY DOWN to touch the '3-PACK' bottom wrap.
+         - Must completely conceal: brand logos, 'AIR', 'SANITIZER', and the red claim strip.
 
-      2. LIQUID JUGS & ASYMMETRICAL BOTTLES (e.g., Lysol, Clorox):
-         - Main Upper Label Mask:
-           * ymin: Start at the dark blue plastic neck collar (covering arched 'KILLS COLD & FLU' claims).
-           * ymax: Stop STRICTLY between 'SANITIZER' and 'CRISP LINEN SCENT'.
-           * DO NOT cover 'LAUNDRY', 'CRISP LINEN SCENT', clothes graphics, or '90 FL OZ' — preserve them cleanly.
-         - Dedicated Left Flank Badge Mask:
-           * The red starburst claim badge on the far-left outer edge ('KILLS 99.9%') MUST have its own independent box.
-           * Set xmin to 0 (hard left canvas border) so that every single red scalloped tooth is completely submerged.
+      2. LIQUID JUGS:
+         - Main Label Mask:
+           * Top (ymin): Anchor directly to the dark blue plastic neck collar.
+           * Bottom (ymax): Must completely enclose the word 'SANITIZER'.
+           * Keep 'LAUNDRY' legible above, and 'CRISP LINEN SCENT' legible below.
+         - Left Flank Badge:
+           * Set xmin to 0 so the mask extends completely off the left edge of the canvas.
            
       3. POUCHES & BOXES (e.g., Arm & Hammer, Tide):
          - Mask top circular heritage emblems, middle co-brand clusters (e.g., 'plus OxiClean / ODOR BLASTERS'), and corner trademarked scent badges.
@@ -481,15 +478,20 @@
           ]
         }],
         generationConfig: {
-          temperature: 0.0,
-          thinkingConfig: {
-            thinkingBudget: 0
+          temperature: 0.1,
+          responseMimeType: "application/json",
+          maxOutputTokens: 2048
           }
         }
       }, selectedModel);
 
       let rawText = detectData.candidates[0]?.content?.parts[0]?.text || "{}";
       rawText = rawText.replace(/```json/g, "").replace(/```/g, "").trim();
+      
+      // Auto-close open JSON objects if truncated
+      if (rawText.lastIndexOf("}") < rawText.lastIndexOf("{")) {
+        rawText += "}";
+      }
       let parsed = JSON.parse(rawText);
 
       rawAiBoxes = Array.isArray(parsed) ? parsed : (parsed.boxes || []);
