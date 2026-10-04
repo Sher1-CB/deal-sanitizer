@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Deal Sanitizer & Auto-Masker v1.1.1</title>
+  <title>Deal Sanitizer & Auto-Masker v1.2.0</title>
   <style>
     body { 
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
@@ -98,23 +98,21 @@
 </head>
 <body>
 
-<div class="app-version-fixed">v1.1.1</div>
+<div class="app-version-fixed">v1.2.0</div>
 
 <div class="container">
   <div class="card full-width">
     <h2>
       Automated Deal Asset Sanitizer 
-      <span class="version-header-badge">v1.1.1</span>
+      <span class="version-header-badge">v1.2.0</span>
     </h2>
     
     <label>Gemini API Key</label>
     <input type="password" id="apiKey" placeholder="AIzaSy...">
 
-    <label>Gemini Model</label>
+    <label id="modelSelectLabel">Gemini Model (Auto-detecting...)</label>
     <select id="modelSelect">
-      <option value="gemini-2.5-flash-lite" selected>gemini-2.5-flash-lite (Fastest)</option>
-      <option value="gemini-2.5-flash">gemini-2.5-flash (High Precision)</option>
-      <option value="gemini-flash-latest">gemini-flash-latest</option>
+      <option value="gemini-2.5-flash-lite" selected>gemini-2.5-flash-lite (Default)</option>
     </select>
   </div>
 
@@ -181,7 +179,6 @@
     </div>
   </div>
 
-  <!-- Suggested Banner Placement Card -->
   <div class="card full-width">
     <div id="bannerPlacementBox" class="banner-guide-box" style="display:none;">
       <div class="banner-guide-title">
@@ -220,9 +217,87 @@
   const savedKey = localStorage.getItem("deal_gemini_key");
   if (savedKey) keyInput.value = savedKey;
 
+  // AUTO-MODEL DETECTION: Queries Google for available models and picks 2nd-to-latest generation Lite variant
+  async function autoDetectAndSelectModel(key) {
+    if (!key) return;
+    const select = document.getElementById("modelSelect");
+    const label = document.getElementById("modelSelectLabel");
+
+    try {
+      label.textContent = "Gemini Model (Detecting available models...)";
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`);
+      const data = await res.json();
+      if (!data.models || !Array.isArray(data.models)) {
+        label.textContent = "Gemini Model";
+        return;
+      }
+
+      // Filter to generation-capable multimodal models
+      const geminiModels = data.models
+        .map(m => m.name.replace("models/", ""))
+        .filter(name => name.includes("gemini") && !name.includes("embedding") && !name.includes("aqa"));
+
+      // Group models by generation (e.g., 3.0, 2.5, 2.0, 1.5)
+      const versionMap = {};
+      geminiModels.forEach(name => {
+        const match = name.match(/gemini-(\d+(?:\.\d+)?)/);
+        if (match) {
+          const ver = parseFloat(match[1]);
+          if (!versionMap[ver]) versionMap[ver] = [];
+          versionMap[ver].push(name);
+        }
+      });
+
+      const sortedVersions = Object.keys(versionMap)
+        .map(Number)
+        .sort((a, b) => b - a); // e.g. [3.0, 2.5, 2.0]
+
+      // Identify 2nd to latest generation (falls back to highest if only 1 exists)
+      const targetVersion = sortedVersions.length >= 2 ? sortedVersions[1] : sortedVersions[0];
+      const targetFamily = versionMap[targetVersion] || [];
+
+      // Find the Lite variant within that target family
+      let autoSelectedModel = targetFamily.find(m => m.includes("lite") && m.includes("flash")) 
+        || targetFamily.find(m => m.includes("lite"))
+        || targetFamily.find(m => m.includes("flash")) 
+        || targetFamily[0]
+        || "gemini-2.5-flash-lite";
+
+      select.innerHTML = "";
+      
+      const optAuto = document.createElement("option");
+      optAuto.value = autoSelectedModel;
+      optAuto.textContent = `${autoSelectedModel} (Auto-Selected: 2nd-to-Latest Lite)`;
+      optAuto.selected = true;
+      select.appendChild(optAuto);
+
+      geminiModels
+        .filter(m => m !== autoSelectedModel && (m.includes("flash") || m.includes("lite")))
+        .forEach(m => {
+          const opt = document.createElement("option");
+          opt.value = m;
+          opt.textContent = m;
+          select.appendChild(opt);
+        });
+
+      label.textContent = `Gemini Model (Active: ${autoSelectedModel})`;
+
+    } catch (err) {
+      console.warn("Dynamic model auto-detection error; keeping fallbacks:", err);
+      label.textContent = "Gemini Model";
+    }
+  }
+
   keyInput.addEventListener("change", () => {
-    localStorage.setItem("deal_gemini_key", keyInput.value.trim());
+    const val = keyInput.value.trim();
+    localStorage.setItem("deal_gemini_key", val);
+    if (val) autoDetectAndSelectModel(val);
   });
+
+  // Run on page load if key is saved
+  if (savedKey) {
+    autoDetectAndSelectModel(savedKey);
+  }
 
   function enforceSafeTitle(rawTitle) {
     if (!rawTitle) return "";
@@ -328,7 +403,7 @@
 
     const btn = document.getElementById("processBtn");
     btn.disabled = true;
-    btn.innerText = "Analyzing Packaging & Generating Suggestions...";
+    btn.innerText = "Analyzing Boundaries & Packaging Geometry...";
 
     try {
       const detectPrompt = `
@@ -336,25 +411,27 @@
 
       TASK 1: COMPLETE VISUAL BOUNDING BOXES (DETERMINISTIC ANCHORS)
       Scan packaging surface. Return normalized coordinates [ymin, xmin, ymax, xmax] (0 to 1000 integers) covering:
-     1. AEROSOL SPRAY CANS, JUGS & BOTTLES:
-         - Handle jugs and liquid bottles (e.g., Lysol, Clorox):
-           * The main mask MUST start from the top blue plastic neck line and extend down to cover the entire arched crest ('KILLS COLD & FLU'), the diagonal brand name ('Lysol'), and 'SANITIZER'.
-           * CRITICAL: Keep 'LAUNDRY' completely visible if possible, but MASK the word 'SANITIZER'.
-           * Enclose the ENTIRE red starburst claim badge on the far left ('KILLS 99.9%') all the way to the outer bottle contour.
-         - Aerosol spray cans: Bounding box for EACH can MUST start directly below the cap rim and extend downward completely enclosing brand crests and red claim badges.
 
-      CRITICAL WHITELIST (WHAT TO KEEP VISIBLE - DO NOT MASK):
-      - Volume and count specs ('16 oz', '8 oz', '90 FL OZ', '72 PAKS', '3-PACK').
-      - Generic product types: 'LAUNDRY', 'MOIST', 'SHAMPOO', 'CONDITIONER', 'DETANGLER', '5 in 1 POWER PAKS', 'Crisp Linen Scent'.
-      - Bottom graphics, clothes illustration, and neutral packaging background.
+      1. AEROSOL SPRAY CANS, JUGS & BOTTLES:
+         - Aerosol spray cans (e.g. Febreze, Air Wick 3-Packs):
+           * The mask for EACH can MUST start right below the spray nozzle and extend ALL THE WAY DOWN to the top edge of the multipack base wrap (where '3-PACK' starts).
+           * MUST completely enclose: brand logo, 'AIR SANITIZER', and the red claim strip ('Eliminates Odors by Killing 99.9%...').
+           * Do NOT stop at the can shoulders—mask the entire middle cylinder down to the multipack footer.
+         - Handle jugs and liquid bottles (e.g., Lysol, Clorox):
+           * Mask MUST start from top neck/shoulder line to cover arched headers ('KILLS COLD, FLU & VIRUSES'), diagonal brand name ('Lysol'), and 'SANITIZER'.
+           * Enclose the ENTIRE red starburst claim badge on the far left ('KILLS 99.9%') all the way to the outer bottle edge contour.
+           * Keep 'LAUNDRY' visible if possible, but completely mask 'SANITIZER'.
 
       2. POUCH CO-BRAND BANNERS & CORNER BADGES:
-         - Enclose 'plus OxiClean', 'ODOR BLASTERS', 'ARM & HAMMER' circular emblem, and trademarked scent badges.
+         - Enclose 'plus OxiClean', 'ODOR BLASTERS', 'ARM & HAMMER' circular emblem, and trademarked scent badges (e.g., 'fresh burst™').
 
       3. PRIMARY BRAND MARKS & MASCOTS:
-         - Primary brand typography, manufacturer emblems, and mascot silhouettes.
+         - Primary brand typography, manufacturer emblems, and mascot silhouettes (e.g. kangaroo, arm & hammer arm).
 
-      NEVER MASK: Product counts, volumes (e.g. 72 PAKS, 90 FL OZ, 3-PACK, 16 oz), generic descriptors ('MOIST', 'SHAMPOO', 'CONDITIONER', 'LAUNDRY', '5 in 1 POWER PAKS', 'Crisp Linen Scent').
+      CRITICAL WHITELIST (WHAT TO KEEP VISIBLE - DO NOT MASK):
+      - Volume and count specs ('16 oz', '8 oz', '90 FL OZ', '72 PAKS', '3-PACK 10 Fl.Oz Each').
+      - Generic product types: 'LAUNDRY', 'MOIST', 'SHAMPOO', 'CONDITIONER', 'DETANGLER', '5 in 1 POWER PAKS', 'Simple Fresh Scent'.
+      - Bottom graphics, clothes illustration, and packaging base.
 
       TASK 2: PACKAGING GEOMETRY & RECOMMENDED MARGIN
       Select best margin from: [10, 12.5, 15, 17.5, 20].
@@ -368,9 +445,9 @@
       DO NOT suggest marketing phrases like "Clip Coupon" or "Hot Deal".
       Focus purely on physical packaging placement guidance.
       Examples:
+      - "Place a wide horizontal banner directly across the middle of all three spray cans, covering between the spray nozzles down to the '3-PACK' footer wrap."
       - "Place a horizontal banner over the upper center circle to conceal the Arm & Hammer logo."
       - "Cover the Lysol brand by placing an angled/diagonal banner across the upper bottle label and over the left red burst badge."
-      - "Overlay a wide horizontal banner directly below the spray nozzle to cover the brand across all three cans."
 
       Return JSON:
       {
@@ -378,8 +455,8 @@
         "recommended_margin_pct": 15,
         "suggested_title": "...",
         "banner_placement_suggestions": [
-          "Place a banner on top of [Brand/Element] at [specific location on package]...",
-          "Cover [Brand/Element] by using a banner across [specific location]..."
+          "Place a banner on top of [Brand/Element] at [location]...",
+          "Cover [Brand/Element] by using a banner across [location]..."
         ]
       }
       `;
@@ -415,7 +492,6 @@
         document.getElementById("suggestedTitle").value = enforceSafeTitle(parsed.suggested_title);
       }
 
-      // Populate Manual Banner Placement Suggestions
       const bannerBox = document.getElementById("bannerPlacementBox");
       const bannerList = document.getElementById("bannerGuideList");
       bannerList.innerHTML = "";
@@ -443,6 +519,7 @@
     }
   });
 
+  // Expands boxes while accommodating wide side badges
   function expandBox(box, paddingRatio) {
     const [ymin, xmin, ymax, xmax] = box;
     const w = xmax - xmin;
@@ -453,7 +530,7 @@
     let newXmin = Math.max(0, Math.round(xmin - padX));
     let newXmax = Math.min(1000, Math.round(xmax + padX));
 
-    // Allow wider masks so side badges (like left red bursts on bottles) are never clipped
+    // Raised from 360 to 650 so side badges (e.g. left bottle burst) don't get clipped
     const maxAllowedWidth = 650;
     if ((newXmax - newXmin) > maxAllowedWidth && w < 400) {
       const center = (xmin + xmax) / 2;
@@ -468,7 +545,7 @@
       newXmax
     ];
   }
-  
+
   function autoUnionHorizontalNeighbors(boxes, hGapTolerance = 35) {
     if (boxes.length <= 1) return boxes;
     let merged = boxes.map(b => [...b]);
@@ -505,6 +582,7 @@
     return merged;
   }
 
+  // Defeats DCT/pHash perceptual matchers via micro-rotation + grain
   function applyPerceptualShift(targetCtx, w, h) {
     const tempCanvas = document.createElement("canvas");
     tempCanvas.width = w;
@@ -516,7 +594,7 @@
     targetCtx.save();
     targetCtx.translate(w / 2, h / 2);
     
-    // 1.8 degree subtle tilt and 104% scale to disrupt hash algorithms
+    // 1.8 degree subtle tilt and 104% scale
     targetCtx.rotate((1.8 * Math.PI) / 180);
     targetCtx.scale(1.04, 1.04);
     targetCtx.drawImage(tempCanvas, -w / 2, -h / 2);
@@ -588,87 +666,86 @@
     document.getElementById("downloadBtn").style.display = "inline-block";
   }
 
+  // Dynamic Radial Diffusion with Dominant Color Tint Underlay
   function applyFrostedDiffusion(x, y, w, h) {
-  if (w <= 0 || h <= 0) return;
-  const rw = Math.max(1, Math.round(w));
-  const rh = Math.max(1, Math.round(h));
+    if (w <= 0 || h <= 0) return;
+    const rw = Math.max(1, Math.round(w));
+    const rh = Math.max(1, Math.round(h));
 
-  // Dynamic blur calculation based on packaging scale (scales up for 1500px+ images)
-  const dynamicBlur = Math.max(35, Math.round(Math.min(canvas.width, canvas.height) * 0.04));
-  const pad = Math.round(dynamicBlur * 1.2);
+    // Dynamic blur scaled to packaging dimensions
+    const dynamicBlur = Math.max(35, Math.round(Math.min(canvas.width, canvas.height) * 0.04));
+    const pad = Math.round(dynamicBlur * 1.2);
 
-  const srcX = Math.max(0, x - pad);
-  const srcY = Math.max(0, y - pad);
-  const srcW = Math.min(loadedImage.naturalWidth - srcX, rw + pad * 2);
-  const srcH = Math.min(loadedImage.naturalHeight - srcY, rh + pad * 2);
+    const srcX = Math.max(0, x - pad);
+    const srcY = Math.max(0, y - pad);
+    const srcW = Math.min(loadedImage.naturalWidth - srcX, rw + pad * 2);
+    const srcH = Math.min(loadedImage.naturalHeight - srcY, rh + pad * 2);
 
-  const off = document.createElement("canvas");
-  off.width = srcW;
-  off.height = srcH;
-  const offCtx = off.getContext("2d");
+    const off = document.createElement("canvas");
+    off.width = srcW;
+    off.height = srcH;
+    const offCtx = off.getContext("2d");
 
-  // Step 1: Neutralize letter contrast by blending a solid base tint from the local pixels
-  const sampleCanvas = document.createElement("canvas");
-  sampleCanvas.width = 1;
-  sampleCanvas.height = 1;
-  const sCtx = sampleCanvas.getContext("2d");
-  sCtx.drawImage(loadedImage, x, y, rw, rh, 0, 0, 1, 1);
-  const [r, g, b] = sCtx.getImageData(0, 0, 1, 1).data;
+    // Sample local dominant color to suppress white letter contrast bleed
+    const sampleCanvas = document.createElement("canvas");
+    sampleCanvas.width = 1;
+    sampleCanvas.height = 1;
+    const sCtx = sampleCanvas.getContext("2d");
+    sCtx.drawImage(loadedImage, x, y, rw, rh, 0, 0, 1, 1);
+    const [r, g, b] = sCtx.getImageData(0, 0, 1, 1).data;
 
-  // Step 2: Aggressive pixel scrambling (destroying letter vectors completely)
-  const scale = 0.025; // Drastically drops resolution so characters cannot survive
-  const mini = document.createElement("canvas");
-  mini.width = Math.max(2, Math.floor(srcW * scale));
-  mini.height = Math.max(2, Math.floor(srcH * scale));
-  const miniCtx = mini.getContext("2d");
-  miniCtx.drawImage(loadedImage, srcX, srcY, srcW, srcH, 0, 0, mini.width, mini.height);
+    // Aggressive pixel downsampling to destroy letter structures
+    const scale = 0.025;
+    const mini = document.createElement("canvas");
+    mini.width = Math.max(2, Math.floor(srcW * scale));
+    mini.height = Math.max(2, Math.floor(srcH * scale));
+    const miniCtx = mini.getContext("2d");
+    miniCtx.drawImage(loadedImage, srcX, srcY, srcW, srcH, 0, 0, mini.width, mini.height);
 
-  // Paint the scrambled pixels
-  offCtx.imageSmoothingEnabled = false;
-  offCtx.drawImage(mini, 0, 0, mini.width, mini.height, 0, 0, srcW, srcH);
-  offCtx.imageSmoothingEnabled = true;
+    offCtx.imageSmoothingEnabled = false;
+    offCtx.drawImage(mini, 0, 0, mini.width, mini.height, 0, 0, srcW, srcH);
+    offCtx.imageSmoothingEnabled = true;
 
-  // Overlay a 45% tint of the package's dominant local color to eliminate white-letter punch-through
-  offCtx.fillStyle = `rgba(${r}, ${g}, ${b}, 0.45)`;
-  offCtx.fillRect(0, 0, srcW, srcH);
+    // Apply color tint wash
+    offCtx.fillStyle = `rgba(${r}, ${g}, ${b}, 0.45)`;
+    offCtx.fillRect(0, 0, srcW, srcH);
 
-  // Step 3: Deep Gaussian blur pass
-  const blurCanvas = document.createElement("canvas");
-  blurCanvas.width = srcW;
-  blurCanvas.height = srcH;
-  const bCtx = blurCanvas.getContext("2d");
-  bCtx.filter = `blur(${dynamicBlur}px)`;
-  bCtx.drawImage(off, 0, 0);
+    // Gaussian diffusion pass
+    const blurCanvas = document.createElement("canvas");
+    blurCanvas.width = srcW;
+    blurCanvas.height = srcH;
+    const bCtx = blurCanvas.getContext("2d");
+    bCtx.filter = `blur(${dynamicBlur}px)`;
+    bCtx.drawImage(off, 0, 0);
 
-  const offsetX = x - srcX;
-  const offsetY = y - srcY;
+    const offsetX = x - srcX;
+    const offsetY = y - srcY;
 
-  // Step 4: True solid-core feathering (100% opaque across 75% of the box, soft outer feather)
-  const patchCanvas = document.createElement("canvas");
-  patchCanvas.width = rw;
-  patchCanvas.height = rh;
-  const pCtx = patchCanvas.getContext("2d");
-  pCtx.drawImage(blurCanvas, offsetX, offsetY, rw, rh, 0, 0, rw, rh);
+    // Composite with soft perimeter feathering
+    const patchCanvas = document.createElement("canvas");
+    patchCanvas.width = rw;
+    patchCanvas.height = rh;
+    const pCtx = patchCanvas.getContext("2d");
+    pCtx.drawImage(blurCanvas, offsetX, offsetY, rw, rh, 0, 0, rw, rh);
 
-  const maskCanvas = document.createElement("canvas");
-  maskCanvas.width = rw;
-  maskCanvas.height = rh;
-  const mCtx = maskCanvas.getContext("2d");
+    const maskCanvas = document.createElement("canvas");
+    maskCanvas.width = rw;
+    maskCanvas.height = rh;
+    const mCtx = maskCanvas.getContext("2d");
 
-  // Keep feather tight to the perimeter so the core never leaks typography
-  const feather = Math.max(8, Math.round(Math.min(rw, rh) * 0.12));
-  mCtx.fillStyle = "#ffffff";
-  mCtx.fillRect(feather, feather, rw - feather * 2, rh - feather * 2);
-  mCtx.filter = `blur(${feather}px)`;
-  mCtx.drawImage(maskCanvas, 0, 0);
+    const feather = Math.max(8, Math.round(Math.min(rw, rh) * 0.12));
+    mCtx.fillStyle = "#ffffff";
+    mCtx.fillRect(feather, feather, rw - feather * 2, rh - feather * 2);
+    mCtx.filter = `blur(${feather}px)`;
+    mCtx.drawImage(maskCanvas, 0, 0);
 
-  pCtx.globalCompositeOperation = "destination-in";
-  pCtx.drawImage(maskCanvas, 0, 0);
+    pCtx.globalCompositeOperation = "destination-in";
+    pCtx.drawImage(maskCanvas, 0, 0);
 
-  ctx.save();
-  ctx.drawImage(patchCanvas, x, y);
-  ctx.restore();
-}
+    ctx.save();
+    ctx.drawImage(patchCanvas, x, y);
+    ctx.restore();
+  }
 
   function applyAmbientBlock(x, y, w, h) {
     if (w <= 0 || h <= 0) return;
