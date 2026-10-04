@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Deal Sanitizer & Auto-Masker v1.0.21</title>
+  <title>Deal Sanitizer & Auto-Masker v1.0.22</title>
   <style>
     body { 
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
@@ -98,13 +98,13 @@
 </head>
 <body>
 
-<div class="app-version-fixed">v1.0.21</div>
+<div class="app-version-fixed">v1.0.22</div>
 
 <div class="container">
   <div class="card full-width">
     <h2>
       Automated Deal Asset Sanitizer 
-      <span class="version-header-badge">v1.0.21</span>
+      <span class="version-header-badge">v1.0.22</span>
     </h2>
     
     <label>Gemini API Key</label>
@@ -224,7 +224,6 @@
     localStorage.setItem("deal_gemini_key", keyInput.value.trim());
   });
 
-  // Strict Programmatic Title Sanitizer with Deduplication
   function enforceSafeTitle(rawTitle) {
     if (!rawTitle) return "";
     let safe = rawTitle;
@@ -236,6 +235,7 @@
       [/\bmeadow\s+fresh(\s+scent)?\b/gi, "Fresh Scent"],
       [/\boriginal\s+fresh(\s+scent)?\b/gi, "Fresh Scent"],
       [/\b(laundry\s+)?sanitizer\b/gi, "Fabric Refresher"],
+      [/\bair\s+sanitizer\b/gi, "Air Refresher"],
       [/\bhand\s+sanitizer\b/gi, "Hand Cleanser"],
       [/\bsanitizer\b/gi, "Refresher"],
       [/\bdisinfectant(\s+spray)?\b/gi, "Cleaning Spray"],
@@ -251,7 +251,6 @@
       safe = safe.replace(regex, replacement);
     });
 
-    // Remove duplicated consecutive words (e.g., "Scent Scent" -> "Scent")
     safe = safe.replace(/\b(\w+)\s+\1\b/gi, "$1");
     return safe.replace(/\s+/g, " ").trim();
   }
@@ -325,7 +324,7 @@
 
     const btn = document.getElementById("processBtn");
     btn.disabled = true;
-    btn.innerText = "Analyzing Surfaces & Clusters...";
+    btn.innerText = "Analyzing Structural Boundaries...";
 
     try {
       const detectPrompt = `
@@ -334,22 +333,21 @@
       TASK 1: COMPLETE VISUAL BOUNDING BOXES (DETERMINISTIC ANCHORS)
       Scan the ENTIRE packaging surface. Return normalized coordinates [ymin, xmin, ymax, xmax] (0 to 1000 integers) covering:
       
-      1. PRIMARY BRAND NAMES & MASCOTS:
-         - DO MASK: All primary brand names, mascots, and logos ('aussie', kangaroo silhouette, 'Arm & Hammer', 'Clorox', 'Lysol'). Look closely for subtle, low-contrast, or tone-on-tone brand typography on bottle shoulders.
-         - NEVER MASK: Generic product descriptors ('MOIST', 'SHAMPOO', 'CONDITIONER', 'DETANGLER', 'POWER PAKS', '5 in 1').
+      1. AEROSOL SPRAY CANS & BOTTLE CLUSTERS (CRITICAL BOUNDARY ENFORCEMENT):
+         - For aerosol spray cans (e.g., Lysol Air Sanitizer): The bounding box for EACH can MUST start directly below the white cap rim and extend DOWNWARD all the way to the top border of the blue bottom base packaging.
+         - This single box per can MUST completely enclose the brand crest, the word 'SANITIZER', and the red medical claim strip ('Eliminates Odors by Killing 99.9%'). Do NOT stop above the word 'SANITIZER'.
       
-      2. HORIZONTAL BANNER CLUSTER EXPANSION (CRITICAL):
-         - Co-brands & secondary banners: e.g., 'OxiClean' + 'ODOR BLASTERS'. The bounding box over middle banners MUST extend horizontally across all stacked or slanted sub-brand text ('ODOR BLASTERS', 'stain fighters') completely through the rightmost edge. Do not clip early at 'OxiClean'.
-         - Scent Badges: Always return a bounding box for lower corner scent badges marked with ™ or ® ('fresh burst™').
+      2. POUCH CO-BRAND BANNERS & CORNER BADGES:
+         - For co-branded clusters (e.g., 'OxiClean' + 'ODOR BLASTERS'): Cover the logo and slanted tagline 'ODOR BLASTERS' tightly without expanding into the far right packaging seam.
+         - Corner scent badges: Always return a separate bounding box for scent badges marked with ™ or ® (e.g., 'fresh burst™').
       
-      3. PHYSICAL LANDMARKS & EMBLEMS:
-         - Circular emblems (e.g. Arm & Hammer crest): Mask must swallow the ENTIRE colored outer ring and radial burst perimeter.
-         - Bottles/cans: Anchor upper boundary directly beneath cap/nozzle seams.
-         - Pathogens/claims: 'BACTERIA', 'VIRUSES', 'SANITIZER', 'DISINFECTANT', 'KILLING 99.9%', and spiky microbe graphics.
+      3. PRIMARY BRAND MARKS & MASCOTS:
+         - Mask primary brand typography and mascot silhouettes ('aussie', kangaroo silhouette, 'Arm & Hammer' circle crest, 'Clorox').
+         - NEVER MASK: Generic descriptors or product types ('MOIST', 'SHAMPOO', 'CONDITIONER', 'DETANGLER', '5 in 1 POWER PAKS').
 
       CRITICAL WHITELIST (WHAT TO KEEP VISIBLE - DO NOT MASK):
-      - Volume and count specs ('16 oz', '8 oz', '90 FL OZ', '72 PAKS', '3-PACK').
-      - Product types/descriptors ('MOIST', 'SHAMPOO', 'CONDITIONER', 'DETANGLER', '5 in 1 POWER PAKS').
+      - Volume and count specs ('16 oz', '8 oz', '90 FL OZ', '72 PAKS', '3-PACK 10 Fl.Oz Each').
+      - Product types/descriptors ('MOIST', 'SHAMPOO', 'CONDITIONER', 'DETANGLER', '5 in 1 POWER PAKS', 'Simple Fresh Scent').
       - Character illustrations and background art.
 
       TASK 2: PACKAGING GEOMETRY & RECOMMENDED MARGIN
@@ -357,7 +355,7 @@
 
       TASK 3: COMPLIANT GENERIC TITLE
       Generate a brand-free, trademark-free title incorporating verified volume/count and generic product type.
-      Example: "72-Count 5-in-1 Laundry Detergent Power Paks - Fresh Scent"
+      Example: "3-Pack 10 Fl. Oz Each Air Fabric Refresher Spray - Simple Fresh Scent"
 
       TASK 4: POSTER SUGGESTIONS
       Provide 2 brief tips confirming what was masked and verifying size/count retention.
@@ -407,7 +405,7 @@
       list.innerHTML = "";
 
       const defaultTip = document.createElement("li");
-      defaultTip.innerHTML = `<b>Zero-Glyph Pipeline Active:</b> 4x4 low-frequency gradient destroys character stems while retaining natural bottle lighting.`;
+      defaultTip.innerHTML = `<b>Boundary Enforcement Active:</b> Aerosol boxes extend down to base banners; pouch masks are clamped to prevent edge sprawl.`;
       list.appendChild(defaultTip);
 
       if (parsed.suggestions && Array.isArray(parsed.suggestions)) {
@@ -429,6 +427,7 @@
     }
   });
 
+  // Margin Expansion with Horizontal Sprawl Clamping
   function expandBox(box, paddingRatio) {
     const [ymin, xmin, ymax, xmax] = box;
     const w = xmax - xmin;
@@ -436,11 +435,21 @@
     const padX = w * paddingRatio;
     const padY = h * paddingRatio;
 
+    let newXmin = Math.max(0, Math.round(xmin - padX));
+    let newXmax = Math.min(1000, Math.round(xmax + padX));
+
+    // Clamp horizontal expansion so masks don't sprawl across >45% of image width unless already wide
+    if (w < 420 && (newXmax - newXmin) > 460) {
+      const center = (xmin + xmax) / 2;
+      newXmin = Math.max(0, Math.round(center - 230));
+      newXmax = Math.min(1000, Math.round(center + 230));
+    }
+
     return [
       Math.max(0, Math.round(ymin - padY)),
-      Math.max(0, Math.round(xmin - padX)),
+      newXmin,
       Math.min(1000, Math.round(ymax + padY)),
-      Math.min(1000, Math.round(xmax + padX))
+      newXmax
     ];
   }
 
