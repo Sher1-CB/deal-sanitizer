@@ -336,10 +336,20 @@
 
       TASK 1: COMPLETE VISUAL BOUNDING BOXES (DETERMINISTIC ANCHORS)
       Scan packaging surface. Return normalized coordinates [ymin, xmin, ymax, xmax] (0 to 1000 integers) covering:
-      1. Spray cans & bottles: Enclose brand names, 'SANITIZER', and red claim badges.
-      2. Pouch co-brand banners: Enclose 'plus OxiClean', 'ODOR BLASTERS', 'ARM & HAMMER' circular emblem, and trademarked scent badges.
-      3. Primary brand marks & mascot silhouettes.
-      NEVER MASK: Product counts, volumes (e.g. 72 PAKS, 90 FL OZ, 3-PACK), generic descriptors ('MOIST', 'SHAMPOO', '5 in 1 POWER PAKS').
+     1. AEROSOL SPRAY CANS, JUGS & BOTTLES:
+         - Handle jugs and liquid bottles (e.g., Lysol, Clorox):
+           * The mask MUST encompass the ENTIRE upper label arc, including any arched text near the neck/shoulder (e.g., 'KILLS COLD, FLU & VIRUSES').
+           * Enclose the ENTIRE left-side scalloped claim badge (e.g., the red 'KILLS 99.9%' burst) all the way to the outer bottle edge.
+           * Completely enclose brand typography, diagonal logos, and 'SANITIZER' / 'DISINFECTANT' text.
+         - Aerosol spray cans: Bounding box for EACH can MUST start directly below the cap rim and extend downward completely enclosing brand crests and red claim badges.
+
+      2. POUCH CO-BRAND BANNERS & CORNER BADGES:
+         - Enclose 'plus OxiClean', 'ODOR BLASTERS', 'ARM & HAMMER' circular emblem, and trademarked scent badges.
+
+      3. PRIMARY BRAND MARKS & MASCOTS:
+         - Primary brand typography, manufacturer emblems, and mascot silhouettes.
+
+      NEVER MASK: Product counts, volumes (e.g. 72 PAKS, 90 FL OZ, 3-PACK, 16 oz), generic descriptors ('MOIST', 'SHAMPOO', 'CONDITIONER', 'LAUNDRY', '5 in 1 POWER PAKS', 'Crisp Linen Scent').
 
       TASK 2: PACKAGING GEOMETRY & RECOMMENDED MARGIN
       Select best margin from: [10, 12.5, 15, 17.5, 20].
