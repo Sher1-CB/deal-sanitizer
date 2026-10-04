@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Deal Sanitizer & Auto-Masker v1.2.21</title>
+  <title>Deal Sanitizer & Auto-Masker v1.2.22</title>
   <style>
     body { 
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
@@ -98,13 +98,13 @@
 </head>
 <body>
 
-<div class="app-version-fixed">v1.2.21</div>
+<div class="app-version-fixed">v1.2.22</div>
 
 <div class="container">
   <div class="card full-width">
     <h2>
       Automated Deal Asset Sanitizer 
-      <span class="version-header-badge">v1.2.21</span>
+      <span class="version-header-badge">v1.2.22</span>
     </h2>
     
     <label>Gemini API Key</label>
@@ -140,7 +140,7 @@
       <div>
         <label id="paddingLabel">Mask Margin (Relative)</label>
         <select id="paddingSelect">
-          <option value="auto" selected>Auto (AI-Contextual: 14%–24%)</option>
+          <option value="auto" selected>Auto (AI-Contextual: 8%–12% Snug)</option>
           <option value="0.12">12% (Tight)</option>
           <option value="0.16">16% (Standard)</option>
           <option value="0.20">20% (Extended)</option>
@@ -203,7 +203,7 @@
 
   let rawAiBoxes = [];
   let manualBoxes = [];
-  let aiRecommendedMargin = 0.18;
+  let aiRecommendedMargin = 0.10;
 
   let isDragging = false;
   let dragStartX = 0;
@@ -417,55 +417,36 @@
 
     try {
       const detectPrompt = `
-      You are an expert AI vision system auditing retail product imagery for absolute compliance and complete trademark suppression.
-      Inspect this packaging image with zero-tolerance precision.
+      You are an expert AI vision system auditing retail product imagery for trademark compliance.
+      Generate snug, precise bounding boxes [ymin, xmin, ymax, xmax] (0 to 1000 integers).
+      AVOID OVERSIZED BOXES. Cover sensitive branding closely without bleeding into safe product text.
 
-      STAGE 1: VISUAL RECONNAISSANCE & INK AUDITING
-      1. Locate all primary brand trademarks, cursive signatures, logos, circular emblems, and mascot silhouettes.
-      2. Locate all secondary claim lines, including scientific testing strips ('SCIENTIFICALLY PROVEN'), germ/virus health claims ('KILLS 99.9%', 'KILLS COLD, FLU & VIRUSES'), and registered scent marks.
-      3. Locate physical structural boundaries: colored plastic cap collars, neck seams, bottom multipack cardboard wraps, and container silhouettes.
+      RULES BY PACKAGING TYPE:
 
-      STAGE 2: VISUAL BOUNDING BOXES (MULTI-BOX PHYSICAL ANCHORING)
-      Return normalized coordinates [ymin, xmin, ymax, xmax] (integers 0 to 1000). Ensure ZERO residual brand ink or claim text peeks through:
+      1. MULTI-PACK CANS (e.g. Febreze 3-Packs):
+         - CRITICAL: Return SEPARATE vertical column boxes for EACH individual can. NEVER combine them into one single wide box.
+         - For each can: Cover the cursive logo, 'AIR', and 'SANITIZER' snugly. Keep individual can shapes distinct.
+         - Return ONE slim horizontal strip specifically for the red claim ribbon ('Eliminates Odors by Killing 99.9%...') right above the '3-PACK' wrap.
 
-      1. MULTI-PACK SPRAY CANS (e.g., Febreze, Air Wick):
-         - Vertical Column Masks for EACH Can:
-           * ymin: MUST start directly below the plastic spray trigger/nozzle hood, fully engulfing any top claim lines such as 'SCIENTIFICALLY PROVEN'.
-           * ymax: MUST extend ALL THE WAY DOWN to touch the '3-PACK' bottom wrap.
-           * Enclose the central cursive brand script, 'AIR', and 'SANITIZER' completely.
-         - Lateral Edge Extensions: The outermost flanks of Can 1 (left) and Can 3 (right) must fully enclose trailing flourishes (such as the letter 'e') and side label curves.
-         - Bottom Claim Strip: Return a dedicated wide horizontal strip covering the red 'Eliminates Odors by Killing 99.9%...' banner immediately above the '3-PACK' wrap.
+      2. JUGS & LIQUID BOTTLES (e.g. Lysol):
+         - Box A (Upper Brand): From the blue neck seam down to the base of the diagonal cursive logo. Stop BEFORE reaching 'LAUNDRY'.
+         - Box B (Sanitizer Word): A snug horizontal strip covering ONLY the word 'SANITIZER'. Keep 'LAUNDRY' and 'CRISP LINEN SCENT' clean and visible.
+         - Box C (Flank Badge): If a red starburst/claim crest is on the left flank, return a tight box covering it with xmin: 0.
 
-      2. LIQUID JUGS & ASYMMETRICAL BOTTLES (e.g., Lysol, Clorox):
-         - Upper Brand Mask:
-           * ymin: Directly at the dark blue plastic neck collar (to cover arched cold/flu text).
-           * ymax: Stop IMMEDIATELY beneath the diagonal brand name ('Lysol'). Do NOT extend down into the text block below.
-         - Category Descriptor Rule:
-           * Keep 'LAUNDRY' and 'CRISP LINEN SCENT' clean and visible.
-           * Return a small, dedicated horizontal strip ONLY over the single word 'SANITIZER'.
-         - Flank Badge:
-           * Set xmin to 0 so the red scalloped badge on the left edge is covered out to the border.
+      3. POUCHES & PACKS (e.g. Arm & Hammer):
+         - Circular Emblem: Fit snugly around the circular logo and sunburst rays without bleeding into the 'ELIMINATES TOUGH ODORS' banner or pod graphics.
+         - Secondary Co-Brand: A compact rectangle over 'plus OxiClean / ODOR BLASTERS'.
+         - Bottom-Right Scent Badge: A small tight box over the corner scent graphic.
 
-      3. POUCHES & BOXES (e.g., Arm & Hammer, Tide):
-         - Mask top circular heritage emblems, middle co-brand clusters (e.g., 'plus OxiClean / ODOR BLASTERS'), and corner trademarked scent badges.
-
-      WHITELIST (DO NOT MASK):
-      - Volume and count indicators ('72 PAKS', '90 FL OZ', '3-PACK 10 Fl.Oz Each', '16 oz', '8 oz').
-      - Generic product categories: 'LAUNDRY', 'MOIST', 'SHAMPOO', 'CONDITIONER', 'DETANGLER', '5 in 1 POWER PAKS', 'Simple Fresh Scent'.
-      - Bottom graphics, clothes illustrations, and multipack cardboard wraps.
-
-      STAGE 3: COMPLIANT GENERIC TITLE & BANNER GUIDANCE
-      - title: [Count/Volume] + [Generic Product Category] + [Key Safe Features] + [Generic Scent if applicable].
-      - banner_placement_suggestions: 2-3 precise physical location directions for placing manual cover stickers/ribbons.
+      WHITELIST (MUST REMAIN CRISP & VISIBLE):
+      - Volumes/Counts: '72 PAKS', '90 FL OZ', '3-PACK 10 Fl.Oz Each', '16 oz'.
+      - Generic Descriptors: 'LAUNDRY', '5 in 1 POWER PAKS', 'CRISP LINEN SCENT', 'Simple Fresh Scent'.
+      - Clothes illustrations, pod images, and cardboard wraps.
 
       Return ONLY valid JSON matching this schema:
       {
-        "visual_audit": {
-          "identified_trademarks": ["..."],
-          "packaging_anchors_used": "..."
-        },
         "boxes": [[ymin, xmin, ymax, xmax]],
-        "recommended_margin_pct": 18,
+        "recommended_margin_pct": 10,
         "suggested_title": "...",
         "banner_placement_suggestions": ["..."]
       }
@@ -536,28 +517,30 @@
     }
   });
 
-  // Relative expansion with perimeter edge-snapping for flank elements
+  // Balanced expansion: Snug fit that avoids swallowing adjacent whitelist text
   function expandBoxDynamically(box, marginRatio) {
     const [ymin, xmin, ymax, xmax] = box;
     const w = xmax - xmin;
     const h = ymax - ymin;
     
-    const padX = Math.round(w * marginRatio);
-    const padY = Math.round(h * marginRatio);
+    // Controlled padding ratio (prevents ballooning on large boxes)
+    const effectiveMargin = Math.min(0.12, marginRatio * 0.65);
+    const padX = Math.round(w * effectiveMargin);
+    const padY = Math.round(h * (effectiveMargin * 0.75));
 
     let newYmin = Math.max(0, ymin - padY);
     let newXmin = Math.max(0, xmin - padX);
     let newYmax = Math.min(1000, ymax + padY);
     let newXmax = Math.min(1000, xmax + padX);
 
-    // Perimeter Edge Snap: Catches wide contour badges on jugs
-    if (newXmin <= 130) newXmin = 0;
-    if (newXmax >= 900) newXmax = 1000;
-    if (newYmin <= 50) newYmin = 0;
+    // Perimeter Edge Snap: ONLY snap boxes that already lie along the extreme container rim
+    if (xmin <= 90) newXmin = 0;
+    if (xmax >= 910) newXmax = 1000;
+    if (ymin <= 40) newYmin = 0;
 
     return [newYmin, newXmin, newYmax, newXmax];
   }
-
+  
   function getPackagingScale() {
     const diag = Math.sqrt(canvas.width * canvas.width + canvas.height * canvas.height);
     return Math.max(0.6, diag / 1400);
