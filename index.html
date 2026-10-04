@@ -338,10 +338,15 @@
       Scan packaging surface. Return normalized coordinates [ymin, xmin, ymax, xmax] (0 to 1000 integers) covering:
      1. AEROSOL SPRAY CANS, JUGS & BOTTLES:
          - Handle jugs and liquid bottles (e.g., Lysol, Clorox):
-           * The mask MUST encompass the ENTIRE upper label arc, including any arched text near the neck/shoulder (e.g., 'KILLS COLD, FLU & VIRUSES').
-           * Enclose the ENTIRE left-side scalloped claim badge (e.g., the red 'KILLS 99.9%' burst) all the way to the outer bottle edge.
-           * Completely enclose brand typography, diagonal logos, and 'SANITIZER' / 'DISINFECTANT' text.
+           * The main mask MUST start from the top blue plastic neck line and extend down to cover the entire arched crest ('KILLS COLD & FLU'), the diagonal brand name ('Lysol'), and 'SANITIZER'.
+           * CRITICAL: Keep 'LAUNDRY' completely visible if possible, but MASK the word 'SANITIZER'.
+           * Enclose the ENTIRE red starburst claim badge on the far left ('KILLS 99.9%') all the way to the outer bottle contour.
          - Aerosol spray cans: Bounding box for EACH can MUST start directly below the cap rim and extend downward completely enclosing brand crests and red claim badges.
+
+      CRITICAL WHITELIST (WHAT TO KEEP VISIBLE - DO NOT MASK):
+      - Volume and count specs ('16 oz', '8 oz', '90 FL OZ', '72 PAKS', '3-PACK').
+      - Generic product types: 'LAUNDRY', 'MOIST', 'SHAMPOO', 'CONDITIONER', 'DETANGLER', '5 in 1 POWER PAKS', 'Crisp Linen Scent'.
+      - Bottom graphics, clothes illustration, and neutral packaging background.
 
       2. POUCH CO-BRAND BANNERS & CORNER BADGES:
          - Enclose 'plus OxiClean', 'ODOR BLASTERS', 'ARM & HAMMER' circular emblem, and trademarked scent badges.
@@ -448,8 +453,9 @@
     let newXmin = Math.max(0, Math.round(xmin - padX));
     let newXmax = Math.min(1000, Math.round(xmax + padX));
 
-    const maxAllowedWidth = 360;
-    if (w < 380 && (newXmax - newXmin) > maxAllowedWidth) {
+    // Allow wider masks so side badges (like left red bursts on bottles) are never clipped
+    const maxAllowedWidth = 650;
+    if ((newXmax - newXmin) > maxAllowedWidth && w < 400) {
       const center = (xmin + xmax) / 2;
       newXmin = Math.max(0, Math.round(center - maxAllowedWidth / 2));
       newXmax = Math.min(1000, Math.round(center + maxAllowedWidth / 2));
@@ -462,7 +468,7 @@
       newXmax
     ];
   }
-
+  
   function autoUnionHorizontalNeighbors(boxes, hGapTolerance = 35) {
     if (boxes.length <= 1) return boxes;
     let merged = boxes.map(b => [...b]);
