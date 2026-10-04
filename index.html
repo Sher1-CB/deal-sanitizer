@@ -249,7 +249,15 @@
         .map(Number)
         .sort((a, b) => b - a);
 
-      const targetVersion = sortedVersions.length >= 2 ? sortedVersions[1] : sortedVersions[0];
+      // Target 3rd-to-latest generation (falls back down if fewer exist)
+      let targetVersion;
+      if (sortedVersions.length >= 3) {
+        targetVersion = sortedVersions[2]; // 3rd latest
+      } else if (sortedVersions.length === 2) {
+        targetVersion = sortedVersions[1]; // 2nd latest
+      } else {
+        targetVersion = sortedVersions[0]; // latest
+      }
       const targetFamily = versionMap[targetVersion] || [];
 
       let autoSelectedModel = targetFamily.find(m => m.includes("lite") && m.includes("flash")) 
@@ -262,7 +270,7 @@
       
       const optAuto = document.createElement("option");
       optAuto.value = autoSelectedModel;
-      optAuto.textContent = `${autoSelectedModel} (Auto-Selected: 2nd-to-Latest Lite)`;
+      optAuto.textContent = `${autoSelectedModel} (Auto-Selected: 3rd-to-Latest Lite)`;
       optAuto.selected = true;
       select.appendChild(optAuto);
 
@@ -420,10 +428,11 @@
          - Return DEDICATED EXTRA BOXES for any exposed brand tails, cursive flourishes, or edge graphics (e.g., the trailing script letter 'e' or side label on the outer flanks).
          - Return a DEDICATED HORIZONTAL STRIP BOX specifically covering the continuous red claim ribbon ('Eliminates Odors by Killing 99.9%...') stretching all the way across from the left can to the right can right above the '3-PACK' footer wrap.
 
-      2. LIQUID JUGS & ASYMMETRICAL BOTTLES:
-         - Main label box: Anchor near the blue neck/shoulder seam to cover arched claims ('KILLS COLD, FLU...'), the diagonal brand script, and 'SANITIZER' (keeping 'LAUNDRY' and volume clean).
-         - DEDICATED SIDE-BADGE BOX (CRITICAL): Return a SEPARATE, independent box specifically for any protruding side crests, red scalloped burst badges ('KILLS 99.9%'), or guarantee stamps hanging off the flank. 
-           * For this badge box: xmin MUST push all the way to the physical outer edge of the bottle/background seam so that ZERO red scalloped teeth or outer tips stick out.
+     2. LIQUID JUGS & ASYMMETRICAL BOTTLES:
+         - Main label box: Enclose top neck arched claims, diagonal brand script, and 'SANITIZER' (leave 'LAUNDRY' and volume intact).
+         - DEDICATED LEFT FLANK BADGE BOX:
+           * For any red starburst/claim badge ('KILLS 99.9%') on the left flank, return a SEPARATE box.
+           * RULE: Set xmin to 0 (hard left edge of image) to completely submerge all outer red scalloped teeth.
 
       3. POUCHES & BOXES:
          - Mask primary circular emblems, secondary co-brand clusters (e.g., 'plus OxiClean / ODOR BLASTERS'), and corner scent badges completely.
