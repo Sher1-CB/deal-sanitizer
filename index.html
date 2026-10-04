@@ -413,10 +413,10 @@
       Scan packaging surface. Return normalized coordinates [ymin, xmin, ymax, xmax] (0 to 1000 integers) covering:
 
       1. AEROSOL SPRAY CANS, JUGS & BOTTLES:
-         - Aerosol spray cans (e.g. Febreze, Air Wick 3-Packs):
-           * The mask for EACH can MUST start right below the spray nozzle and extend ALL THE WAY DOWN to the top edge of the multipack base wrap (where '3-PACK' starts).
-           * MUST completely enclose: brand logo, 'AIR SANITIZER', and the red claim strip ('Eliminates Odors by Killing 99.9%...').
-           * Do NOT stop at the can shoulders—mask the entire middle cylinder down to the multipack footer.
+        - Aerosol spray cans (e.g. Febreze, Air Wick 3-Packs):
+           * The mask MUST span HORIZONTALLY across ALL cans from the far-left contour of can #1 all the way to the far-right contour of can #3.
+           * VERTICALLY: Must start directly below the plastic spray nozzles and extend DOWNWARD so that it overlaps slightly into the top edge of the '3-PACK' bottom base wrap.
+           * Zero brand letters or red claim text ('Eliminates Odors...') may remain visible on any can.
          - Handle jugs and liquid bottles (e.g., Lysol, Clorox):
            * Mask MUST start from top neck/shoulder line to cover arched headers ('KILLS COLD, FLU & VIRUSES'), diagonal brand name ('Lysol'), and 'SANITIZER'.
            * Enclose the ENTIRE red starburst claim badge on the far left ('KILLS 99.9%') all the way to the outer bottle edge contour.
@@ -637,7 +637,8 @@
     const enableHashShield = document.getElementById("hashShieldSelect").value === "true";
 
     let processedBoxes = rawAiBoxes.map(b => expandBox(b, paddingRatio));
-    processedBoxes = autoUnionHorizontalNeighbors(processedBoxes, 35);
+    // Allows clustered aerosol cans and bottles across the pack to bridge into one unified wide mask
+    processedBoxes = autoUnionHorizontalNeighbors(processedBoxes, 70);
 
     const allBoxes = [...processedBoxes, ...manualBoxes];
 
