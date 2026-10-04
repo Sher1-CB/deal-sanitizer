@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Deal Sanitizer & Auto-Masker v1.0.24</title>
+  <title>Deal Sanitizer & Auto-Masker v1.0.25</title>
   <style>
     body { 
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
@@ -98,13 +98,13 @@
 </head>
 <body>
 
-<div class="app-version-fixed">v1.0.24</div>
+<div class="app-version-fixed">v1.0.25</div>
 
 <div class="container">
   <div class="card full-width">
     <h2>
       Automated Deal Asset Sanitizer 
-      <span class="version-header-badge">v1.0.24</span>
+      <span class="version-header-badge">v1.0.25</span>
     </h2>
     
     <label>Gemini API Key</label>
@@ -134,8 +134,8 @@
 
     <label>Masking Visual Style</label>
     <select id="maskMode">
-      <option value="diffusion" selected>Dynamic Frosted Diffusion (Best for Sunbursts/Gradients)</option>
-      <option value="ambient">Ambient Gradient Block (4x4 Solid Bottles)</option>
+      <option value="diffusion" selected>Dynamic Frosted Diffusion (Soft-Edge Feather)</option>
+      <option value="ambient">Ambient Gradient Block (Solid Bottles)</option>
       <option value="pixelate">Mosaic Pixelation</option>
       <option value="solid">Clean Dark Tape</option>
     </select>
@@ -153,10 +153,10 @@
         </select>
       </div>
       <div>
-        <label>Merge Stacked Boxes</label>
-        <select id="mergeSelect">
-          <option value="false" selected>No - Keep Separate</option>
-          <option value="true">Yes - Fuse Clusters</option>
+        <label>Anti-Crawler Shield (pHash)</label>
+        <select id="hashShieldSelect">
+          <option value="true" selected>Enabled (Micro-Grain Hash Buster)</option>
+          <option value="false">Disabled (Standard Image)</option>
         </select>
       </div>
     </div>
@@ -343,7 +343,7 @@
          - Must completely enclose brand crest, 'SANITIZER', and red claim strips ('Eliminates Odors by Killing 99.9%').
       
       2. POUCH CO-BRAND BANNERS & CORNER BADGES:
-         - For middle co-brand clusters (e.g., 'plus OxiClean' + 'ODOR BLASTERS'): Cover the logo and slanted tagline 'ODOR BLASTERS' as a single cohesive horizontal line without ballooning into the far right packaging seam.
+         - For middle co-brand clusters (e.g., 'plus OxiClean' + 'ODOR BLASTERS'): Cover the logo and tagline as a single cohesive horizontal line without sprawling into the far right packaging seam.
          - Corner scent badges: Return a separate box for scent badges marked with ™ or ® (e.g., 'fresh burst™').
       
       3. PRIMARY BRAND MARKS & MASCOTS:
@@ -411,7 +411,7 @@
       list.innerHTML = "";
 
       const defaultTip = document.createElement("li");
-      defaultTip.innerHTML = `<b>Horizontal Auto-Union:</b> Adjacent text fragments on the same line are merged to eliminate patchwork boxes.`;
+      defaultTip.innerHTML = `<b>Perceptual Shield Active:</b> Soft-feather blending and anti-crawler micro-noise applied to defeat reverse-image scrapers.`;
       list.appendChild(defaultTip);
 
       if (parsed.suggestions && Array.isArray(parsed.suggestions)) {
@@ -433,7 +433,6 @@
     }
   });
 
-  // Clamp width to prevent horizontal runaway
   function expandBox(box, paddingRatio) {
     const [ymin, xmin, ymax, xmax] = box;
     const w = xmax - xmin;
@@ -444,7 +443,7 @@
     let newXmin = Math.max(0, Math.round(xmin - padX));
     let newXmax = Math.min(1000, Math.round(xmax + padX));
 
-    const maxAllowedWidth = 360; // 36% max width constraint
+    const maxAllowedWidth = 360;
     if (w < 380 && (newXmax - newXmin) > maxAllowedWidth) {
       const center = (xmin + xmax) / 2;
       newXmin = Math.max(0, Math.round(center - maxAllowedWidth / 2));
@@ -459,7 +458,6 @@
     ];
   }
 
-  // Auto-Union Horizontal Neighbors on the Same Line
   function autoUnionHorizontalNeighbors(boxes, hGapTolerance = 35) {
     if (boxes.length <= 1) return boxes;
     let merged = boxes.map(b => [...b]);
@@ -472,12 +470,10 @@
           const [y1_min, x1_min, y1_max, x1_max] = merged[i];
           const [y2_min, x2_min, y2_max, x2_max] = merged[j];
 
-          // Check if vertically aligned (same horizontal row)
           const vOverlap = Math.min(y1_max, y2_max) - Math.max(y1_min, y2_min);
           const minH = Math.min(y1_max - y1_min, y2_max - y2_min);
           const isSameRow = vOverlap > minH * 0.45;
 
-          // Check horizontal proximity or overlap
           const isAdjacentH = !(x1_max + hGapTolerance < x2_min || x2_max + hGapTolerance < x1_min);
 
           if (isSameRow && isAdjacentH) {
@@ -498,37 +494,30 @@
     return merged;
   }
 
-  function mergeCloseBoxes(boxes, thresholdX = 40, thresholdY = 60) {
-    if (boxes.length <= 1) return boxes;
-    let merged = boxes.map(b => [...b]);
-    let changed = true;
+  // Micro-Grain Texture Injection to break Perceptual Image Hashing (pHash)
+  function applyMicroGrain(targetCtx, w, h) {
+    const grainCanvas = document.createElement("canvas");
+    grainCanvas.width = 128;
+    grainCanvas.height = 128;
+    const gCtx = grainCanvas.getContext("2d");
+    const imgData = gCtx.createImageData(128, 128);
+    const d = imgData.data;
 
-    while (changed) {
-      changed = false;
-      for (let i = 0; i < merged.length; i++) {
-        for (let j = i + 1; j < merged.length; j++) {
-          const [y1_min, x1_min, y1_max, x1_max] = merged[i];
-          const [y2_min, x2_min, y2_max, x2_max] = merged[j];
-
-          const overlapX = !(x1_max + thresholdX < x2_min || x2_max + thresholdX < x1_min);
-          const overlapY = !(y1_max + thresholdY < y2_min || y2_max + thresholdY < y1_min);
-
-          if (overlapX && overlapY) {
-            merged[i] = [
-              Math.min(y1_min, y2_min),
-              Math.min(x1_min, x2_min),
-              Math.max(y1_max, y2_max),
-              Math.max(x1_max, x2_max)
-            ];
-            merged.splice(j, 1);
-            changed = true;
-            break;
-          }
-        }
-        if (changed) break;
-      }
+    for (let i = 0; i < d.length; i += 4) {
+      const val = Math.random() * 255;
+      d[i] = val;
+      d[i + 1] = val;
+      d[i + 2] = val;
+      d[i + 3] = 20; // 8% alpha noise
     }
-    return merged;
+    gCtx.putImageData(imgData, 0, 0);
+
+    targetCtx.save();
+    targetCtx.globalAlpha = 0.035; // Imperceptible to humans, disrupts DCT hash algorithms
+    const pattern = targetCtx.createPattern(grainCanvas, "repeat");
+    targetCtx.fillStyle = pattern;
+    targetCtx.fillRect(0, 0, w, h);
+    targetCtx.restore();
   }
 
   function renderAllMasks() {
@@ -540,18 +529,10 @@
     const mode = document.getElementById("maskMode").value;
     const paddingVal = document.getElementById("paddingSelect").value;
     const paddingRatio = paddingVal === "auto" ? aiRecommendedMargin : parseFloat(paddingVal);
-    const shouldMerge = document.getElementById("mergeSelect").value === "true";
+    const enableHashShield = document.getElementById("hashShieldSelect").value === "true";
 
-    // 1. Expand AI boxes
     let processedBoxes = rawAiBoxes.map(b => expandBox(b, paddingRatio));
-
-    // 2. Always auto-union horizontal same-line neighbors
     processedBoxes = autoUnionHorizontalNeighbors(processedBoxes, 35);
-
-    // 3. Optional vertical cluster fusion
-    if (shouldMerge) {
-      processedBoxes = mergeCloseBoxes(processedBoxes, 40, 60);
-    }
 
     const allBoxes = [...processedBoxes, ...manualBoxes];
 
@@ -573,10 +554,15 @@
       }
     });
 
+    // Apply anti-crawler micro-grain pass
+    if (enableHashShield) {
+      applyMicroGrain(ctx, canvas.width, canvas.height);
+    }
+
     document.getElementById("downloadBtn").style.display = "inline-block";
   }
 
-  // Mode 1: Dynamic Frosted Diffusion (Preserves natural packaging sunbursts and gradients)
+  // Soft-Feathered Frosted Diffusion
   function applyFrostedDiffusion(x, y, w, h) {
     if (w <= 0 || h <= 0) return;
     const rw = Math.max(1, Math.round(w));
@@ -593,7 +579,7 @@
     off.height = srcH;
     const offCtx = off.getContext("2d");
 
-    // Downsample pass (8%) to break sharp font glyphs
+    // 1. Mosaic pass to destroy typography
     const scale = 0.08;
     const mini = document.createElement("canvas");
     mini.width = Math.max(1, Math.floor(srcW * scale));
@@ -605,7 +591,7 @@
     offCtx.drawImage(mini, 0, 0, mini.width, mini.height, 0, 0, srcW, srcH);
     offCtx.imageSmoothingEnabled = true;
 
-    // Heavy Gaussian diffusion to smoothly blend the packaging sunburst
+    // 2. Heavy Gaussian diffusion pass
     const blurCanvas = document.createElement("canvas");
     blurCanvas.width = srcW;
     blurCanvas.height = srcH;
@@ -615,12 +601,36 @@
 
     const offsetX = x - srcX;
     const offsetY = y - srcY;
+
+    // 3. Soft-Edge Alpha Feathering (Eliminates hard rectangular borders)
+    const feather = Math.max(6, Math.min(12, Math.floor(Math.min(rw, rh) * 0.15)));
+    const patchCanvas = document.createElement("canvas");
+    patchCanvas.width = rw;
+    patchCanvas.height = rh;
+    const pCtx = patchCanvas.getContext("2d");
+
+    pCtx.drawImage(blurCanvas, offsetX, offsetY, rw, rh, 0, 0, rw, rh);
+
+    // Create feathered alpha mask
+    const maskCanvas = document.createElement("canvas");
+    maskCanvas.width = rw;
+    maskCanvas.height = rh;
+    const mCtx = maskCanvas.getContext("2d");
+    mCtx.fillStyle = "#ffffff";
+    mCtx.fillRect(feather, feather, rw - feather * 2, rh - feather * 2);
+    mCtx.filter = `blur(${feather}px)`;
+    mCtx.drawImage(maskCanvas, 0, 0);
+
+    // Composite mask into patch
+    pCtx.globalCompositeOperation = "destination-in";
+    pCtx.drawImage(maskCanvas, 0, 0);
+
+    // Draw seamlessly feathered patch onto main canvas
     ctx.save();
-    ctx.drawImage(blurCanvas, offsetX, offsetY, rw, rh, x, y, rw, rh);
+    ctx.drawImage(patchCanvas, x, y);
     ctx.restore();
   }
 
-  // Mode 2: Ambient Gradient Block (4x4 Solid Color Synthesizer for Solid Bottles)
   function applyAmbientBlock(x, y, w, h) {
     if (w <= 0 || h <= 0) return;
     const rw = Math.max(1, Math.round(w));
