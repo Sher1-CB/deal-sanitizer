@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Deal Sanitizer & Auto-Masker v1.2.13</title>
+  <title>Deal Sanitizer & Auto-Masker v1.2.14</title>
   <style>
     body { 
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
@@ -98,13 +98,13 @@
 </head>
 <body>
 
-<div class="app-version-fixed">v1.2.13</div>
+<div class="app-version-fixed">v1.2.14</div>
 
 <div class="container">
   <div class="card full-width">
     <h2>
       Automated Deal Asset Sanitizer 
-      <span class="version-header-badge">v1.2.13</span>
+      <span class="version-header-badge">v1.2.14</span>
     </h2>
     
     <label>Gemini API Key</label>
@@ -216,14 +216,14 @@
   const savedKey = localStorage.getItem("deal_gemini_key");
   if (savedKey) keyInput.value = savedKey;
 
-  // DYNAMIC MODEL SELECTION: Enforces true LITE model discovery and selects 3rd-to-latest generation
+  // DYNAMIC MODEL SELECTION: Selects stable production models (avoids coordinate-drifting previews)
   async function autoDetectAndSelectModel(key) {
     if (!key) return;
     const select = document.getElementById("modelSelect");
     const label = document.getElementById("modelSelectLabel");
 
     try {
-      label.textContent = "Gemini Model (Detecting available models...)";
+      label.textContent = "Gemini Model (Detecting stable models...)";
       const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`);
       const data = await res.json();
       if (!data.models || !Array.isArray(data.models)) {
@@ -231,46 +231,35 @@
         return;
       }
 
-      // Filter STRICTLY to models that have 'lite' in their identifier
-      const allLiteModels = data.models
+      // Filter out preview/experimental builds to ensure stable coordinate bounding
+      const stableModels = data.models
         .map(m => m.name.replace("models/", ""))
-        .filter(name => name.toLowerCase().includes("gemini") && name.toLowerCase().includes("lite") && !name.includes("embedding"));
+        .filter(name => {
+          const lower = name.toLowerCase();
+          return lower.includes("gemini") && 
+                 (lower.includes("flash") || lower.includes("lite")) && 
+                 !lower.includes("preview") && 
+                 !lower.includes("experimental") &&
+                 !lower.includes("embedding") &&
+                 !lower.includes("aqa");
+        });
 
-      const liteVersionMap = {};
-      allLiteModels.forEach(name => {
-        const match = name.match(/gemini-(\d+(?:\.\d+)?)/i);
-        if (match) {
-          const ver = parseFloat(match[1]);
-          if (!liteVersionMap[ver]) liteVersionMap[ver] = [];
-          liteVersionMap[ver].push(name);
-        }
-      });
-
-      const sortedLiteVersions = Object.keys(liteVersionMap)
-        .map(Number)
-        .sort((a, b) => b - a);
-
-      let targetVersion;
-      if (sortedLiteVersions.length >= 3) {
-        targetVersion = sortedLiteVersions[2]; // Exactly 3rd latest generation of Lite
-      } else if (sortedLiteVersions.length === 2) {
-        targetVersion = sortedLiteVersions[1];
-      } else {
-        targetVersion = sortedLiteVersions[0];
-      }
-
-      const targetFamily = liteVersionMap[targetVersion] || [];
-      let autoSelectedModel = targetFamily[0] || (allLiteModels.length > 0 ? allLiteModels[0] : "gemini-2.5-flash-lite");
+      // Prefer high-precision stable Flash/Lite models
+      let autoSelectedModel = stableModels.find(m => m.includes("3.7-flash"))
+        || stableModels.find(m => m.includes("2.5-flash-lite"))
+        || stableModels.find(m => m.includes("2.5-flash"))
+        || stableModels[0]
+        || "gemini-2.5-flash-lite";
 
       select.innerHTML = "";
       
       const optAuto = document.createElement("option");
       optAuto.value = autoSelectedModel;
-      optAuto.textContent = `${autoSelectedModel} (Auto-Selected: 3rd-Latest Lite)`;
+      optAuto.textContent = `${autoSelectedModel} (Recommended Stable)`;
       optAuto.selected = true;
       select.appendChild(optAuto);
 
-      allLiteModels
+      stableModels
         .filter(m => m !== autoSelectedModel)
         .forEach(m => {
           const opt = document.createElement("option");
@@ -523,22 +512,23 @@
     const w = xmax - xmin;
     const h = ymax - ymin;
     
+    // Balanced padding
     const padX = Math.round(w * marginRatio);
-    const padY = Math.round(h * (marginRatio * 0.75));
+    const padY = Math.round(h * marginRatio);
 
     let newYmin = Math.max(0, ymin - padY);
     let newXmin = Math.max(0, xmin - padX);
     let newYmax = Math.min(1000, ymax + padY);
     let newXmax = Math.min(1000, xmax + padX);
 
-    // Perimeter Edge Snap: Protruding badges within 10% of the canvas borders snap completely to outer borders
-    if (newXmin <= 100) newXmin = 0;
-    if (newXmax >= 900) newXmax = 1000;
+    // Edge-snapping: if the box is within 8% of image borders, seal it to the frame
+    if (newXmin <= 80) newXmin = 0;
+    if (newXmax >= 920) newXmax = 1000;
     if (newYmin <= 50) newYmin = 0;
 
     return [newYmin, newXmin, newYmax, newXmax];
   }
-
+  
   function getPackagingScale() {
     const diag = Math.sqrt(canvas.width * canvas.width + canvas.height * canvas.height);
     return Math.max(0.6, diag / 1400);
