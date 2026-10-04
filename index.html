@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Deal Sanitizer & Auto-Masker v1.2.22</title>
+  <title>Deal Sanitizer & Auto-Masker v1.2.23</title>
   <style>
     body { 
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
@@ -98,13 +98,13 @@
 </head>
 <body>
 
-<div class="app-version-fixed">v1.2.22</div>
+<div class="app-version-fixed">v1.2.23</div>
 
 <div class="container">
   <div class="card full-width">
     <h2>
       Automated Deal Asset Sanitizer 
-      <span class="version-header-badge">v1.2.22</span>
+      <span class="version-header-badge">v1.2.23</span>
     </h2>
     
     <label>Gemini API Key</label>
@@ -417,33 +417,43 @@
 
     try {
       const detectPrompt = `
-      You are an expert AI vision system auditing retail product imagery for trademark compliance.
-      Generate snug, precise bounding boxes [ymin, xmin, ymax, xmax] (0 to 1000 integers).
-      AVOID OVERSIZED BOXES. Cover sensitive branding closely without bleeding into safe product text.
+      You are an automated Intellectual Property & Regulatory Compliance Auditor.
+      Your job is to eliminate ALL triggers that automated copyright, trademark, and ad policy scanners flag on social media (Meta/Facebook).
 
-      RULES BY PACKAGING TYPE:
+      CRITICAL ENFORCEMENT TARGETS (ZERO-TOLERANCE):
+      1. Primary & Secondary Brand Names, Logos, Emblems, and cursive wordmarks.
+      2. Health, Medical, Virus & Disinfectant Claims: e.g. 'COVID-19', 'COLD, FLU & VIRUSES', 'KILLS 99.9%', 'SCIENTIFICALLY PROVEN', 'SANITIZER'.
+      3. Registered Sub-Brands & Scent Trademarks: Any term accompanied by ™ or ®, e.g. 'ODOR BLASTERS', 'fresh burst™', 'OxiClean'.
+      4. Promotional & Regulatory Claim Strips across base packaging.
 
-      1. MULTI-PACK CANS (e.g. Febreze 3-Packs):
-         - CRITICAL: Return SEPARATE vertical column boxes for EACH individual can. NEVER combine them into one single wide box.
-         - For each can: Cover the cursive logo, 'AIR', and 'SANITIZER' snugly. Keep individual can shapes distinct.
-         - Return ONE slim horizontal strip specifically for the red claim ribbon ('Eliminates Odors by Killing 99.9%...') right above the '3-PACK' wrap.
+      STAGE 1: GENERATE PRECISE BOUNDING BOXES [ymin, xmin, ymax, xmax] (0-1000 INTEGERS):
 
-      2. JUGS & LIQUID BOTTLES (e.g. Lysol):
-         - Box A (Upper Brand): From the blue neck seam down to the base of the diagonal cursive logo. Stop BEFORE reaching 'LAUNDRY'.
-         - Box B (Sanitizer Word): A snug horizontal strip covering ONLY the word 'SANITIZER'. Keep 'LAUNDRY' and 'CRISP LINEN SCENT' clean and visible.
-         - Box C (Flank Badge): If a red starburst/claim crest is on the left flank, return a tight box covering it with xmin: 0.
+      1. MULTI-PACK SPRAY CANS (e.g. Febreze 3-Packs):
+         - Can Tops: Mask the 'SCIENTIFICALLY PROVEN' claim strip on each can collar (or extend the top of the can mask upward to include it).
+         - Can Bodies: Individual vertical masks over brand cursive scripts, 'AIR', and 'SANITIZER' on each can.
+         - Bottom Claim Strip: A dedicated horizontal strip box covering the ENTIRE red 'Eliminates Odors by Killing 99.9%...' banner across all cans right above '3-PACK'.
+
+      2. LIQUID JUGS (e.g. Lysol):
+         - Neck Arch: A dedicated box over the arched 'KILLS COLD, FLU & COVID-19 VIRUSES' banner near the collar.
+         - Brand Logo: Snug box over the diagonal brand script.
+         - Word Mask: Snug box over 'SANITIZER' (keep 'LAUNDRY' and 'CRISP LINEN SCENT' clean).
+         - Left Flank Badge: A dedicated box for the red starburst 'KILLS 99.9%' badge with xmin: 0 touching the left image edge.
 
       3. POUCHES & PACKS (e.g. Arm & Hammer):
-         - Circular Emblem: Fit snugly around the circular logo and sunburst rays without bleeding into the 'ELIMINATES TOUGH ODORS' banner or pod graphics.
-         - Secondary Co-Brand: A compact rectangle over 'plus OxiClean / ODOR BLASTERS'.
-         - Bottom-Right Scent Badge: A small tight box over the corner scent graphic.
+         - Heritage Logo: Snug box over the circular hammer emblem.
+         - Co-Brand / Sub-Brand Block: Snug box covering 'plus OxiClean' AND 'ODOR BLASTERS'.
+         - Trademark Scent Badge: A dedicated box covering the bottom-right 'fresh burst™' badge.
 
-      WHITELIST (MUST REMAIN CRISP & VISIBLE):
-      - Volumes/Counts: '72 PAKS', '90 FL OZ', '3-PACK 10 Fl.Oz Each', '16 oz'.
-      - Generic Descriptors: 'LAUNDRY', '5 in 1 POWER PAKS', 'CRISP LINEN SCENT', 'Simple Fresh Scent'.
-      - Clothes illustrations, pod images, and cardboard wraps.
+      WHITELIST (PRESERVE CLEANLY):
+      - Quantities/Volumes: '72 PAKS', '90 FL OZ', '3-PACK 10 Fl.Oz Each', '16 oz'.
+      - Neutral Category Words: 'LAUNDRY', '5 in 1 POWER PAKS', 'Simple Fresh Scent'.
+      - Clothes artwork, laundry pods, and packaging handles.
 
-      Return ONLY valid JSON matching this schema:
+      STAGE 2: COMPLIANT GENERIC TITLE & BANNER PLACEMENT
+      - title: Brand-free generic description.
+      - banner_placement_suggestions: 2-3 physical directions for manual stickers.
+
+      Return ONLY valid JSON:
       {
         "boxes": [[ymin, xmin, ymax, xmax]],
         "recommended_margin_pct": 10,
@@ -533,10 +543,10 @@
     let newYmax = Math.min(1000, ymax + padY);
     let newXmax = Math.min(1000, xmax + padX);
 
-    // Perimeter Edge Snap: ONLY snap boxes that already lie along the extreme container rim
-    if (xmin <= 90) newXmin = 0;
-    if (xmax >= 910) newXmax = 1000;
-    if (ymin <= 40) newYmin = 0;
+    // Perimeter Edge Snap: Catches flank crests and border claims
+    if (xmin <= 120) newXmin = 0;
+    if (xmax >= 880) newXmax = 1000;
+    if (ymin <= 60) newYmin = 0;
 
     return [newYmin, newXmin, newYmax, newXmax];
   }
