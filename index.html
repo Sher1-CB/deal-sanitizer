@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Deal Sanitizer & Auto-Masker v1.2.15</title>
+  <title>Deal Sanitizer & Auto-Masker v1.2.16</title>
   <style>
     body { 
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
@@ -98,13 +98,13 @@
 </head>
 <body>
 
-<div class="app-version-fixed">v1.2.15</div>
+<div class="app-version-fixed">v1.2.16</div>
 
 <div class="container">
   <div class="card full-width">
     <h2>
       Automated Deal Asset Sanitizer 
-      <span class="version-header-badge">v1.2.15</span>
+      <span class="version-header-badge">v1.2.16</span>
     </h2>
     
     <label>Gemini API Key</label>
@@ -439,13 +439,14 @@
          - Lateral Edge Extensions: The outermost flanks of Can 1 (left) and Can 3 (right) must fully enclose trailing flourishes (such as the letter 'e') and side label curves.
          - Bottom Claim Strip: Return a dedicated wide horizontal strip covering the red 'Eliminates Odors by Killing 99.9%...' banner immediately above the '3-PACK' wrap.
 
-      2. LIQUID JUGS & ASYMMETRICAL BOTTLES:
-         - Main label box:
-           * MUST start at the blue neck collar and extend down across the arched text, diagonal brand name, and the word 'SANITIZER'.
-           * DO NOT cover 'LAUNDRY' — keep 'LAUNDRY' and '90 FL OZ' legible, but completely conceal 'SANITIZER'.
-         - CRITICAL FLANK BURST BADGE:
-           * The red starburst claim badge on the far-left outer edge ('KILLS 99.9%') MUST have its own dedicated box.
-           * For this badge box, set xmin to 0 so the mask extends completely off the left side of the bottle silhouette.
+      2. LIQUID JUGS & ASYMMETRICAL BOTTLES (e.g., Lysol, Clorox):
+         - Main Upper Label Mask:
+           * ymin: Start at the dark blue plastic neck collar (covering arched 'KILLS COLD & FLU' claims).
+           * ymax: Stop STRICTLY between 'SANITIZER' and 'CRISP LINEN SCENT'.
+           * DO NOT cover 'LAUNDRY', 'CRISP LINEN SCENT', clothes graphics, or '90 FL OZ' — preserve them cleanly.
+         - Dedicated Left Flank Badge Mask:
+           * The red starburst claim badge on the far-left outer edge ('KILLS 99.9%') MUST have its own independent box.
+           * Set xmin to 0 (hard left canvas border) so that every single red scalloped tooth is completely submerged.
            
       3. POUCHES & BOXES (e.g., Arm & Hammer, Tide):
          - Mask top circular heritage emblems, middle co-brand clusters (e.g., 'plus OxiClean / ODOR BLASTERS'), and corner trademarked scent badges.
@@ -713,9 +714,9 @@
     const feather = Math.max(6, Math.round(Math.min(rw, rh) * 0.10));
     mCtx.fillStyle = "#ffffff";
     
-    // If the box is snapped flush to the left border, do NOT dissolve the left edge away
+    // If snapped flush to canvas border, draw straight to edge with zero falloff so flank badges never leak
     if (isBorderSnapped) {
-      mCtx.fillRect(0, feather, rw - feather, rh - feather * 2);
+      mCtx.fillRect(0, 0, rw - feather, rh);
     } else {
       mCtx.fillRect(feather, feather, rw - feather * 2, rh - feather * 2);
     }
