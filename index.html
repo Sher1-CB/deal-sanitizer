@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Deal Sanitizer & Auto-Masker v1.0.16</title>
+  <title>Deal Sanitizer & Auto-Masker v1.0.17</title>
   <style>
     body { 
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
@@ -98,13 +98,13 @@
 </head>
 <body>
 
-<div class="app-version-fixed">v1.0.16</div>
+<div class="app-version-fixed">v1.0.17</div>
 
 <div class="container">
   <div class="card full-width">
     <h2>
       Automated Deal Asset Sanitizer 
-      <span class="version-header-badge">v1.0.16</span>
+      <span class="version-header-badge">v1.0.17</span>
     </h2>
     
     <label>Gemini API Key</label>
@@ -134,7 +134,7 @@
 
     <label>Masking Visual Style</label>
     <select id="maskMode">
-      <option value="blur" selected>Zero-Leak Frosted Blur (OCR Proof)</option>
+      <option value="blur" selected>Zero-Leak Frosted Blur (Isolated Buffer)</option>
       <option value="pixelate">Mosaic Pixelation</option>
       <option value="solid">Clean Dark Tape</option>
     </select>
@@ -320,15 +320,17 @@
 
     const btn = document.getElementById("processBtn");
     btn.disabled = true;
-    btn.innerText = "Analyzing Landmarks & Geometries...";
+    btn.innerText = "Scanning Physical Landmarks...";
 
     try {
       const detectPrompt = `
       Examine this product packaging for automated affiliate compliance.
 
-      TASK 1: COMPLETE VISUAL BOUNDING BOXES (DETERMINISTIC)
+      TASK 1: COMPLETE VISUAL BOUNDING BOXES (DETERMINISTIC ANCHORS)
       Scan the ENTIRE packaging surface. Return normalized coordinates [ymin, xmin, ymax, xmax] (0 to 1000 integers) covering:
-      1. PHYSICAL LANDMARK ANCHORING: For bottle neck, collar, shoulder, or upper-body logos, extend the top edge (ymin) completely to the physical base of the plastic cap, trigger spray mechanism, or neck seam to guarantee zero sliver leaks.
+      1. STRUCTURAL LANDMARK ANCHORING:
+         - For aerosol spray cans or bottles: Anchor target boundaries to structural seams. Return a single bounding box per can/bottle starting directly below the cap rim/nozzle neck and extending down to the top edge of the colored base pack banner. This encapsulates the brand logo, product title, and medical/sanitizing claims in one cohesive block per can.
+         - For jug/dispenser necks: Extend ymin up to the base of the handle opening or cap collar to eliminate top-edge slivers.
       2. EMBLEMS & BACKGROUND SHAPES: For logos inside colored backing shapes (e.g. red circular seals, starbursts, shields), the bounding box MUST swallow the ENTIRE colored background shape and outer perimeter tips.
       3. BANNER STRIPS: If detecting text on an upper/lower banner strip, encapsulate the ENTIRE continuous phrase horizontally without truncating words.
       4. Secondary brand names, co-brands, and partner ingredients ('OxiClean', 'CLOROX', 'Febreze').
@@ -363,7 +365,6 @@
       }
       `;
 
-      // API call with temperature locked to 0 for reproducibility
       const detectData = await callGeminiWithFallback(key, {
         contents: [{
           parts: [
@@ -372,7 +373,7 @@
           ]
         }],
         generationConfig: {
-          temperature: 0
+          temperature: 0.0
         }
       }, selectedModel);
 
@@ -400,7 +401,7 @@
       list.innerHTML = "";
 
       const defaultTip = document.createElement("li");
-      defaultTip.innerHTML = `<b>Landmark Anchoring Active:</b> Neck logos are anchored to cap seams; deterministic temperature set to 0.`;
+      defaultTip.innerHTML = `<b>Isolated Buffer Rendering:</b> Blur filters are isolated offscreen to eliminate full-canvas bleeding onto nozzles and caps.`;
       list.appendChild(defaultTip);
 
       if (parsed.suggestions && Array.isArray(parsed.suggestions)) {
@@ -508,27 +509,36 @@
     document.getElementById("downloadBtn").style.display = "inline-block";
   }
 
+  // Offscreen Decoupled Frosted Blur: Eliminates any global canvas filter bleed
   function applyZeroLeakBlur(x, y, w, h) {
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(x - 3, y - 3, w + 6, h + 6);
-    ctx.clip();
+    if (w <= 0 || h <= 0) return;
 
-    const scale = 0.035;
     const off = document.createElement("canvas");
-    off.width = Math.max(1, Math.floor(w * scale));
-    off.height = Math.max(1, Math.floor(h * scale));
+    off.width = Math.max(1, Math.round(w));
+    off.height = Math.max(1, Math.round(h));
     const offCtx = off.getContext("2d");
 
-    offCtx.drawImage(canvas, x, y, w, h, 0, 0, off.width, off.height);
-    ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(off, 0, 0, off.width, off.height, x, y, w, h);
+    // Downsample stage to break letter glyphs
+    const scale = 0.05;
+    const thumb = document.createElement("canvas");
+    thumb.width = Math.max(1, Math.floor(w * scale));
+    thumb.height = Math.max(1, Math.floor(h * scale));
+    const thumbCtx = thumb.getContext("2d");
+    thumbCtx.drawImage(loadedImage, x, y, w, h, 0, 0, thumb.width, thumb.height);
 
-    ctx.filter = "blur(20px)";
-    ctx.drawImage(canvas, x - 10, y - 10, w + 20, h + 20, x - 10, y - 10, w + 20, h + 20);
-    ctx.drawImage(canvas, x - 10, y - 10, w + 20, h + 20, x - 10, y - 10, w + 20, h + 20);
+    offCtx.imageSmoothingEnabled = false;
+    offCtx.drawImage(thumb, 0, 0, thumb.width, thumb.height, 0, 0, off.width, off.height);
 
-    ctx.restore();
+    // Apply Gaussian blur strictly to the offscreen buffer
+    const blurCanvas = document.createElement("canvas");
+    blurCanvas.width = off.width;
+    blurCanvas.height = off.height;
+    const blurCtx = blurCanvas.getContext("2d");
+    blurCtx.filter = "blur(18px)";
+    blurCtx.drawImage(off, 0, 0);
+
+    // Stamp back precisely within bounds
+    ctx.drawImage(blurCanvas, x, y, w, h);
   }
 
   function applyPixelation(x, y, w, h) {
