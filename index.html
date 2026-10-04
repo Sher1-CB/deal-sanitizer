@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Deal Sanitizer & Auto-Masker v1.0.09</title>
+  <title>Deal Sanitizer & Auto-Masker v1.0.10</title>
   <style>
     body { 
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
@@ -12,7 +12,6 @@
       position: relative;
     }
     
-    /* Top-Right Version Pill */
     .app-version-fixed {
       position: fixed;
       top: 1rem;
@@ -29,7 +28,6 @@
       box-shadow: 0 2px 4px rgba(0,0,0,0.4);
     }
 
-    /* Header Title Badge */
     .version-header-badge {
       display: inline-block;
       font-size: 0.85rem;
@@ -66,13 +64,11 @@
     .preview-box { display: flex; flex-direction: column; align-items: center; justify-content: flex-start; }
     .hint { font-size: 0.75rem; color: #94a3b8; margin-top: 0.3rem; margin-bottom: 1rem; }
 
-    /* Suggested Title Container */
     .title-row { display: flex; gap: 0.5rem; }
     .title-row input { margin-bottom: 0; font-size: 0.95rem; font-weight: 500; color: #38bdf8; background: #090d16; border-color: #0284c7; }
     .title-row button { width: 140px; margin-bottom: 0; background: #0284c7; }
     .title-row button:hover { background: #0369a1; }
 
-    /* Poster Suggestions Box */
     .suggestions-container {
       background: #0f172a;
       border: 1px solid #334155;
@@ -102,15 +98,13 @@
 </head>
 <body>
 
-<!-- Fixed Top-Right Badge -->
-<div class="app-version-fixed">v1.0.09</div>
+<div class="app-version-fixed">v1.0.10</div>
 
 <div class="container">
-  <!-- Top Settings Header -->
   <div class="card full-width">
     <h2>
       Automated Deal Asset Sanitizer 
-      <span class="version-header-badge">v1.0.09</span>
+      <span class="version-header-badge">v1.0.10</span>
     </h2>
     
     <label>Gemini API Key</label>
@@ -126,7 +120,6 @@
     </select>
   </div>
 
-  <!-- Left: Inputs & Configuration -->
   <div class="card">
     <h3>Input Controls</h3>
     
@@ -135,7 +128,7 @@
 
     <label>Sanitization Scope</label>
     <select id="sanitizationScope">
-      <option value="co_branded" selected>Deep Scan: Primary Logos + Co-Brands + ™/® Symbols</option>
+      <option value="co_branded" selected>Deep Scan: Logos + Pathogen Icons + Claims + ™/®</option>
       <option value="logos_only">Primary Brand Logos Only</option>
     </select>
 
@@ -146,7 +139,6 @@
       <option value="solid">Clean Dark Tape</option>
     </select>
 
-    <!-- Margin Padding & Cluster Merging Controls -->
     <div class="grid-2col">
       <div>
         <label>Mask Margin (Padding)</label>
@@ -172,25 +164,23 @@
     </div>
 
     <div class="btn-row">
-      <button id="resetMasksBtn" class="secondary" title="Clears masks from current image">Reset Masks</button>
-      <button id="uploadNewBtn" class="danger" title="Clear image and pick a new one">Upload New Image</button>
+      <button id="resetMasksBtn" class="secondary">Reset Masks</button>
+      <button id="uploadNewBtn" class="danger">Upload New Image</button>
     </div>
   </div>
 
-  <!-- Right: Canvas Preview -->
   <div class="card preview-box">
     <h3>Masked Output Preview</h3>
     <div class="hint">💡 <b>Tip:</b> Click and drag directly on the image to manually mask any missed secondary text.</div>
     <canvas id="outputCanvas"></canvas>
     
     <div class="btn-row" style="width: 100%; margin-top: 1rem;">
-      <button id="reapplyBtn" class="secondary" title="Re-apply padding/merge settings without calling API">Re-apply Style</button>
-      <button id="undoBtn" class="secondary" title="Remove the last manual box">Undo Last Mask</button>
+      <button id="reapplyBtn" class="secondary">Re-apply Style</button>
+      <button id="undoBtn" class="secondary">Undo Last Mask</button>
       <button id="downloadBtn" class="success" style="display:none;">Download Image</button>
     </div>
   </div>
 
-  <!-- Bottom: Suggested Title Box -->
   <div class="card full-width">
     <label style="font-size: 0.95rem; color: #38bdf8; font-weight: bold;">Suggested Compliant Title (Brand-Free)</label>
     <div class="title-row">
@@ -199,7 +189,6 @@
     </div>
   </div>
 
-  <!-- Bottom: Poster Suggestions -->
   <div class="card full-width">
     <div id="posterSuggestions" class="suggestions-container" style="display:none;">
       <div class="suggestions-title">
@@ -225,7 +214,6 @@
   const canvas = document.getElementById("outputCanvas");
   const ctx = canvas.getContext("2d");
 
-  // LocalStorage Key Sync
   const keyInput = document.getElementById("apiKey");
   const savedKey = localStorage.getItem("deal_gemini_key");
   if (savedKey) keyInput.value = savedKey;
@@ -234,7 +222,6 @@
     localStorage.setItem("deal_gemini_key", keyInput.value.trim());
   });
 
-  // Handle Image Upload
   document.getElementById("imageInput").addEventListener("change", function(e) {
     const file = e.target.files[0];
     if (!file) return;
@@ -256,7 +243,6 @@
     reader.readAsDataURL(file);
   });
 
-  // Reset Masks on Current Image
   document.getElementById("resetMasksBtn").addEventListener("click", () => {
     if (!loadedImage) return;
     rawAiBoxes = [];
@@ -264,7 +250,6 @@
     renderAllMasks();
   });
 
-  // Upload New Image
   document.getElementById("uploadNewBtn").addEventListener("click", () => {
     loadedImage = null;
     base64Image = "";
@@ -280,13 +265,11 @@
     fileInput.click();
   });
 
-  // Re-apply style instantly (with new padding or merge settings)
   document.getElementById("reapplyBtn").addEventListener("click", () => {
     if (!loadedImage) return;
     renderAllMasks();
   });
 
-  // Undo last mask
   document.getElementById("undoBtn").addEventListener("click", () => {
     if (manualBoxes.length > 0) {
       manualBoxes.pop();
@@ -297,7 +280,6 @@
     }
   });
 
-  // AI Processing Call
   document.getElementById("processBtn").addEventListener("click", async () => {
     const key = keyInput.value.trim();
     const scope = document.getElementById("sanitizationScope").value;
@@ -308,30 +290,27 @@
 
     const btn = document.getElementById("processBtn");
     btn.disabled = true;
-    btn.innerText = "Scanning Trademarks & ™ Badges...";
+    btn.innerText = "Scanning Packaging, Badges & Icons...";
 
     try {
       const detectPrompt = `
-      Analyze this product packaging for affiliate deal posting compliance.
+      Analyze this product packaging for affiliate compliance.
 
-      TASK 1: CO-BRAND & TRADEMARK DETECTION (CRITICAL)
-      Detect ALL registered trademarks, logos, brand emblems, and proprietary taglines across the packaging.
-      IMPORTANT:
-      1. Primary manufacturer logo/emblem (e.g., Arm & Hammer)
-      2. Secondary co-brands and ingredient partner logos (e.g., OxiClean, Febreze, Downy, Clorox)
-      3. Trademarked taglines and adjacent modifiers: 'plus', 'stain fighters', 'ODOR BLASTERS', 'ultra'
-      4. ALL TRADEMARK-SYMBOL TAGLINES (™, ®): Look specifically for any scent names or formula badges that carry a ™ or ® symbol (such as 'fresh burst™', 'mountain spring™') anywhere on the packaging, especially in corner callout badges. ANY text with ™ or ® MUST be masked!
-      5. Sanitizer/medical claims ('AIR SANITIZER', 'SANITIZER', 'DISINFECTANT', 'ANTIBACTERIAL', 'KILLING 99.9%', 'VIRUSES', 'BACTERIA', 'SCIENTIFICALLY PROVEN').
-      
-      Return normalized coordinates [ymin, xmin, ymax, xmax] (0 to 1000 integers).
+      TASK 1: DETECTION (BOUNDING BOXES)
+      Return normalized coordinates [ymin, xmin, ymax, xmax] (0 to 1000 integers) for:
+      1. Brand logos, trademarks, and manufacturer emblems.
+      2. Secondary co-brands and ingredient partner logos.
+      3. PATHOGEN & MICROBE GRAPHICS: Any illustrations of viruses, bacteria, spiky germ balls, or microbe graphics (such as pink/green coronavirus-style spiky balls).
+      4. Regulatory, sanitizing, or antimicrobial buzzwords ('AIR SANITIZER', 'SANITIZER', 'DISINFECTANT', 'ANTIBACTERIAL', 'KILLING 99.9%', 'VIRUSES', 'BACTERIA', 'SCIENTIFICALLY PROVEN').
+      5. Any badges or text carrying ™ or ® symbols.
 
-      TASK 2: SUGGESTED COMPLIANT TITLE
-      Generate a generic, brand-free deal post title based on the package specifications (count, pack size, scent, product type).
-      STRICT RULE: Absolutely DO NOT include ANY brand or trademark name (no "Arm & Hammer", no "OxiClean", no "fresh burst" - use generic descriptors like "Fresh Scent").
-      Example: "72-Count 5-in-1 Laundry Detergent Power Paks - Fresh Scent"
+      TASK 2: SUGGESTED TITLE
+      Generate a generic, brand-free deal post title based on bottle count, size, scent, and item type.
+      RULE: Never include brand names or medical claims.
+      Example: "2-Pack 32oz All-Purpose Eucalyptus Surface Cleaner"
 
       TASK 3: POSTER SUGGESTIONS
-      Provide 2-3 brief bullet suggestions for the affiliate poster.
+      Provide 2 brief tips for the affiliate poster.
 
       Return JSON:
       {
@@ -357,18 +336,16 @@
       rawAiBoxes = Array.isArray(parsed) ? parsed : (parsed.boxes || []);
       renderAllMasks();
 
-      // Render Suggested Title
       if (parsed.suggested_title) {
         document.getElementById("suggestedTitle").value = parsed.suggested_title;
       }
 
-      // Render Suggestions
       const suggestionsBox = document.getElementById("posterSuggestions");
       const list = document.getElementById("suggestionsList");
       list.innerHTML = "";
 
       const defaultTip = document.createElement("li");
-      defaultTip.innerHTML = `<b>Trademark Symbol Check:</b> Always verify that secondary scent names with a <b>™</b> (like <i>fresh burst™</i>) are fully masked.`;
+      defaultTip.innerHTML = `<b>Visual Graphic Check:</b> Ensure all pathogen and spiky virus illustrations are fully concealed.`;
       list.appendChild(defaultTip);
 
       if (parsed.suggestions && Array.isArray(parsed.suggestions)) {
@@ -390,7 +367,6 @@
     }
   });
 
-  // Algorithm 1: Expand Bounding Box by Margin (Padding)
   function expandBox(box, paddingRatio) {
     const [ymin, xmin, ymax, xmax] = box;
     const w = xmax - xmin;
@@ -406,7 +382,6 @@
     ];
   }
 
-  // Algorithm 2: Merge Overlapping or Closely Stacked Boxes
   function mergeCloseBoxes(boxes, thresholdX = 40, thresholdY = 60) {
     if (boxes.length <= 1) return boxes;
     let merged = boxes.map(b => [...b]);
@@ -440,7 +415,6 @@
     return merged;
   }
 
-  // Render Pipeline
   function renderAllMasks() {
     if (!loadedImage) return;
 
@@ -451,10 +425,8 @@
     const paddingRatio = parseFloat(document.getElementById("paddingSelect").value);
     const shouldMerge = document.getElementById("mergeSelect").value === "true";
 
-    // 1. Expand AI boxes by padding ratio
     let processedBoxes = rawAiBoxes.map(b => expandBox(b, paddingRatio));
 
-    // 2. Merge if explicitly selected
     if (shouldMerge) {
       processedBoxes = mergeCloseBoxes(processedBoxes, 40, 60);
     }
@@ -480,7 +452,6 @@
     document.getElementById("downloadBtn").style.display = "inline-block";
   }
 
-  // Zero-Leak Frosted Blur (Pixelates first, then blurs)
   function applyZeroLeakBlur(x, y, w, h) {
     ctx.save();
     ctx.beginPath();
@@ -524,7 +495,6 @@
     ctx.restore();
   }
 
-  // Interactive Drag-to-Mask
   function getCanvasCoords(evt) {
     const rect = canvas.getBoundingClientRect();
     const scaleX = canvas.width / rect.width;
@@ -577,7 +547,6 @@
     renderAllMasks();
   });
 
-  // Copy Title Helper
   document.getElementById("copyTitleBtn").addEventListener("click", () => {
     const title = document.getElementById("suggestedTitle").value;
     if (!title) return;
@@ -585,7 +554,6 @@
     alert("Title copied to clipboard!");
   });
 
-  // Fallback API Call
   async function callGeminiWithFallback(key, body, initialModel) {
     const candidateModels = [
       initialModel,
@@ -623,7 +591,6 @@
     throw lastError || new Error("All active Gemini models failed.");
   }
 
-  // Download Output
   document.getElementById("downloadBtn").addEventListener("click", () => {
     const link = document.createElement("a");
     link.download = "sanitized-product.png";
