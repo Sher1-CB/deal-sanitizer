@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Deal Sanitizer & Auto-Masker v1.0.10</title>
+  <title>Deal Sanitizer & Auto-Masker v1.0.11</title>
   <style>
     body { 
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
@@ -98,13 +98,13 @@
 </head>
 <body>
 
-<div class="app-version-fixed">v1.0.10</div>
+<div class="app-version-fixed">v1.0.11</div>
 
 <div class="container">
   <div class="card full-width">
     <h2>
       Automated Deal Asset Sanitizer 
-      <span class="version-header-badge">v1.0.10</span>
+      <span class="version-header-badge">v1.0.11</span>
     </h2>
     
     <label>Gemini API Key</label>
@@ -128,7 +128,7 @@
 
     <label>Sanitization Scope</label>
     <select id="sanitizationScope">
-      <option value="co_branded" selected>Deep Scan: Logos + Pathogen Icons + Claims + ™/®</option>
+      <option value="co_branded" selected>Deep Scan: Dual Brands + Graphic Labels + Claims</option>
       <option value="logos_only">Primary Brand Logos Only</option>
     </select>
 
@@ -182,7 +182,7 @@
   </div>
 
   <div class="card full-width">
-    <label style="font-size: 0.95rem; color: #38bdf8; font-weight: bold;">Suggested Compliant Title (Brand-Free)</label>
+    <label style="font-size: 0.95rem; color: #38bdf8; font-weight: bold;">Suggested Compliant Title (Brand & Claim Free)</label>
     <div class="title-row">
       <input type="text" id="suggestedTitle" readonly placeholder="Compliant, generic title will automatically appear here after processing...">
       <button id="copyTitleBtn">Copy Title</button>
@@ -221,6 +221,29 @@
   keyInput.addEventListener("change", () => {
     localStorage.setItem("deal_gemini_key", keyInput.value.trim());
   });
+
+  // Programmatic Title Sanitizer
+  function enforceSafeTitle(rawTitle) {
+    if (!rawTitle) return "";
+    let safe = rawTitle;
+    const rules = [
+      [/\b(laundry\s+)?sanitizer\b/gi, "Fabric Refresher"],
+      [/\bhand\s+sanitizer\b/gi, "Hand Cleanser"],
+      [/\bsanitizer\b/gi, "Refresher"],
+      [/\bdisinfectant(\s+spray)?\b/gi, "Cleaning Spray"],
+      [/\bdisinfecting\b/gi, "Deep Cleaning"],
+      [/\bantibacterial\b/gi, "Odor-Fighting"],
+      [/\bkills\s+99\.9%(?:\s+of\s+germs)?\b/gi, "Total Clean"],
+      [/\bclorox\b/gi, ""],
+      [/\blysol\b/gi, ""],
+      [/\barm\s*&\s*hammer\b/gi, ""],
+      [/\boxiclean\b/gi, ""]
+    ];
+    rules.forEach(([regex, replacement]) => {
+      safe = safe.replace(regex, replacement);
+    });
+    return safe.replace(/\s+/g, " ").trim();
+  }
 
   document.getElementById("imageInput").addEventListener("change", function(e) {
     const file = e.target.files[0];
@@ -290,24 +313,25 @@
 
     const btn = document.getElementById("processBtn");
     btn.disabled = true;
-    btn.innerText = "Scanning Packaging, Badges & Icons...";
+    btn.innerText = "Analyzing All Surfaces & Claims...";
 
     try {
       const detectPrompt = `
-      Analyze this product packaging for affiliate compliance.
+      Examine this product packaging for automated affiliate compliance.
 
-      TASK 1: DETECTION (BOUNDING BOXES)
-      Return normalized coordinates [ymin, xmin, ymax, xmax] (0 to 1000 integers) for:
-      1. Brand logos, trademarks, and manufacturer emblems.
-      2. Secondary co-brands and ingredient partner logos.
-      3. PATHOGEN & MICROBE GRAPHICS: Any illustrations of viruses, bacteria, spiky germ balls, or microbe graphics (such as pink/green coronavirus-style spiky balls).
-      4. Regulatory, sanitizing, or antimicrobial buzzwords ('AIR SANITIZER', 'SANITIZER', 'DISINFECTANT', 'ANTIBACTERIAL', 'KILLING 99.9%', 'VIRUSES', 'BACTERIA', 'SCIENTIFICALLY PROVEN').
-      5. Any badges or text carrying ™ or ® symbols.
+      TASK 1: COMPLETE VISUAL BOUNDING BOXES
+      Scan the ENTIRE packaging, including lower banners, central artwork, and internal product illustrations (e.g. clothing graphics, vignettes).
+      Return normalized coordinates [ymin, xmin, ymax, xmax] (0 to 1000 integers) covering:
+      1. All primary brand logos and emblems (e.g., Clorox, Lysol).
+      2. All secondary brand names embedded within illustrations, callout badges, or label text (e.g., embedded 'CLOROX' words on graphic icons or banner strips).
+      3. All health/medical claims and pathogen triggers ('BACTERIA', 'VIRUSES', 'SANITIZER', 'DISINFECTANT', 'ODORS & BACTERIA', 'GERMS', 'KILLING 99.9%').
+      4. Any pathogen illustrations (spiky balls, virus shapes).
 
-      TASK 2: SUGGESTED TITLE
-      Generate a generic, brand-free deal post title based on bottle count, size, scent, and item type.
-      RULE: Never include brand names or medical claims.
-      Example: "2-Pack 32oz All-Purpose Eucalyptus Surface Cleaner"
+      TASK 2: COMPLIANT GENERIC TITLE
+      Generate a brand-free and claim-free title based on fluid ounces/count, scent, and form factor.
+      STRICT FORBIDDEN WORDS: Do NOT use brand names OR restricted terms like "Sanitizer", "Disinfectant", "Antibacterial", "Bleach".
+      MANDATORY REPLACEMENT: Replace "Sanitizer" with "Fabric Refresher", "Laundry Rinse", or "Odor Eliminator".
+      Example format: "90 fl oz Crisp Linen Laundry Fabric Refresher"
 
       TASK 3: POSTER SUGGESTIONS
       Provide 2 brief tips for the affiliate poster.
@@ -337,7 +361,7 @@
       renderAllMasks();
 
       if (parsed.suggested_title) {
-        document.getElementById("suggestedTitle").value = parsed.suggested_title;
+        document.getElementById("suggestedTitle").value = enforceSafeTitle(parsed.suggested_title);
       }
 
       const suggestionsBox = document.getElementById("posterSuggestions");
@@ -345,7 +369,7 @@
       list.innerHTML = "";
 
       const defaultTip = document.createElement("li");
-      defaultTip.innerHTML = `<b>Visual Graphic Check:</b> Ensure all pathogen and spiky virus illustrations are fully concealed.`;
+      defaultTip.innerHTML = `<b>Illustration Check:</b> Ensure secondary brand text printed over clothing or background artwork is completely concealed.`;
       list.appendChild(defaultTip);
 
       if (parsed.suggestions && Array.isArray(parsed.suggestions)) {
