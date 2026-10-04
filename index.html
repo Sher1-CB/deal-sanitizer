@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Deal Sanitizer & Auto-Masker v1.0.15</title>
+  <title>Deal Sanitizer & Auto-Masker v1.0.16</title>
   <style>
     body { 
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
@@ -98,13 +98,13 @@
 </head>
 <body>
 
-<div class="app-version-fixed">v1.0.15</div>
+<div class="app-version-fixed">v1.0.16</div>
 
 <div class="container">
   <div class="card full-width">
     <h2>
       Automated Deal Asset Sanitizer 
-      <span class="version-header-badge">v1.0.15</span>
+      <span class="version-header-badge">v1.0.16</span>
     </h2>
     
     <label>Gemini API Key</label>
@@ -320,19 +320,21 @@
 
     const btn = document.getElementById("processBtn");
     btn.disabled = true;
-    btn.innerText = "Scanning Packaging & Specs...";
+    btn.innerText = "Analyzing Landmarks & Geometries...";
 
     try {
       const detectPrompt = `
       Examine this product packaging for automated affiliate compliance.
 
-      TASK 1: COMPLETE VISUAL BOUNDING BOXES (WHAT TO MASK)
-      Return normalized coordinates [ymin, xmin, ymax, xmax] (0 to 1000 integers) covering:
-      1. All primary brand logos, crests, starburst backgrounds, and colored backing shapes.
-      2. Secondary brand names, co-brands, and partner ingredients ('OxiClean', 'CLOROX', 'Febreze').
-      3. Trademarked slogans or scent lines carrying ™ or ® (e.g. 'Fresh Burst™').
-      4. Regulated medical/sanitation claims ('BACTERIA', 'VIRUSES', 'SANITIZER', 'DISINFECTANT', 'KILLING 99.9%').
-      5. Pathogen/virus visual illustrations (spiky balls).
+      TASK 1: COMPLETE VISUAL BOUNDING BOXES (DETERMINISTIC)
+      Scan the ENTIRE packaging surface. Return normalized coordinates [ymin, xmin, ymax, xmax] (0 to 1000 integers) covering:
+      1. PHYSICAL LANDMARK ANCHORING: For bottle neck, collar, shoulder, or upper-body logos, extend the top edge (ymin) completely to the physical base of the plastic cap, trigger spray mechanism, or neck seam to guarantee zero sliver leaks.
+      2. EMBLEMS & BACKGROUND SHAPES: For logos inside colored backing shapes (e.g. red circular seals, starbursts, shields), the bounding box MUST swallow the ENTIRE colored background shape and outer perimeter tips.
+      3. BANNER STRIPS: If detecting text on an upper/lower banner strip, encapsulate the ENTIRE continuous phrase horizontally without truncating words.
+      4. Secondary brand names, co-brands, and partner ingredients ('OxiClean', 'CLOROX', 'Febreze').
+      5. Trademarked slogans or scent lines carrying ™ or ® (e.g. 'Fresh Burst™').
+      6. Regulated medical/sanitation claims ('BACTERIA', 'VIRUSES', 'SANITIZER', 'DISINFECTANT', 'KILLING 99.9%').
+      7. Pathogen/virus visual illustrations (spiky balls).
 
       CRITICAL WHITELIST (WHAT TO KEEP VISIBLE - DO NOT MASK):
       - DO NOT mask bottle volume or size measurements (e.g., '90 FL OZ', '32 FL OZ', '946 mL').
@@ -361,13 +363,17 @@
       }
       `;
 
+      // API call with temperature locked to 0 for reproducibility
       const detectData = await callGeminiWithFallback(key, {
         contents: [{
           parts: [
             { text: detectPrompt },
             { inline_data: { mime_type: imageMimeType, data: base64Image } }
           ]
-        }]
+        }],
+        generationConfig: {
+          temperature: 0
+        }
       }, selectedModel);
 
       let rawText = detectData.candidates[0]?.content?.parts[0]?.text || "{}";
@@ -394,7 +400,7 @@
       list.innerHTML = "";
 
       const defaultTip = document.createElement("li");
-      defaultTip.innerHTML = `<b>Conversion Safeguard:</b> Package volume, count, and generic scent notes are preserved to maximize deal appeal.`;
+      defaultTip.innerHTML = `<b>Landmark Anchoring Active:</b> Neck logos are anchored to cap seams; deterministic temperature set to 0.`;
       list.appendChild(defaultTip);
 
       if (parsed.suggestions && Array.isArray(parsed.suggestions)) {
