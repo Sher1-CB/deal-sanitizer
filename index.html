@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Deal Sanitizer & Auto-Masker v1.2.10</title>
+  <title>Deal Sanitizer & Auto-Masker v1.2.11</title>
   <style>
     body { 
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
@@ -98,13 +98,13 @@
 </head>
 <body>
 
-<div class="app-version-fixed">v1.2.10</div>
+<div class="app-version-fixed">v1.2.11</div>
 
 <div class="container">
   <div class="card full-width">
     <h2>
       Automated Deal Asset Sanitizer 
-      <span class="version-header-badge">v1.2.10</span>
+      <span class="version-header-badge">v1.2.11</span>
     </h2>
     
     <label>Gemini API Key</label>
@@ -517,7 +517,7 @@
     }
   });
 
-  // Pure scale-invariant relative expansion without arbitrary hardcoded limits
+  // Pure scale-invariant relative expansion with perimeter edge-snapping
   function expandBoxDynamically(box, marginRatio) {
     const [ymin, xmin, ymax, xmax] = box;
     const w = xmax - xmin;
@@ -526,12 +526,18 @@
     const padX = Math.round(w * marginRatio);
     const padY = Math.round(h * (marginRatio * 0.75));
 
-    return [
-      Math.max(0, ymin - padY),
-      Math.max(0, xmin - padX),
-      Math.min(1000, ymax + padY),
-      Math.min(1000, xmax + padX)
-    ];
+    let newYmin = Math.max(0, ymin - padY);
+    let newXmin = Math.max(0, xmin - padX);
+    let newYmax = Math.min(1000, ymax + padY);
+    let newXmax = Math.min(1000, xmax + padX);
+
+    // Contextual Edge Snap: If any mask touches or borders the outer flanks (< 50 or > 950),
+    // firmly snap it to the canvas border so edge teeth/flourishes never leak through feathering
+    if (newXmin <= 50) newXmin = 0;
+    if (newXmax >= 950) newXmax = 1000;
+    if (newYmin <= 40) newYmin = 0;
+
+    return [newYmin, newXmin, newYmax, newXmax];
   }
 
   // Resolution-invariant scale factor based on packaging canvas diagonal
