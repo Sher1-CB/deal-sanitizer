@@ -140,9 +140,9 @@
       <div>
         <label id="paddingLabel">Mask Margin (Relative)</label>
         <select id="paddingSelect">
-          <option value="auto" selected>Auto (AI-Contextual: 12%–22%)</option>
-          <option value="0.10">10% (Tight)</option>
-          <option value="0.15">15% (Standard)</option>
+          <option value="auto" selected>Auto (AI-Contextual: 14%–24%)</option>
+          <option value="0.12">12% (Tight)</option>
+          <option value="0.16">16% (Standard)</option>
           <option value="0.20">20% (Extended)</option>
           <option value="0.25">25% (Broad Shield)</option>
         </select>
@@ -203,7 +203,7 @@
 
   let rawAiBoxes = [];
   let manualBoxes = [];
-  let aiRecommendedMargin = 0.16;
+  let aiRecommendedMargin = 0.18;
 
   let isDragging = false;
   let dragStartX = 0;
@@ -216,7 +216,7 @@
   const savedKey = localStorage.getItem("deal_gemini_key");
   if (savedKey) keyInput.value = savedKey;
 
-  // DYNAMIC MODEL SELECTION: Queries available models and auto-selects 2nd-to-latest Lite variant
+  // DYNAMIC MODEL SELECTION: Enforces true LITE model discovery and selects 3rd-to-latest generation
   async function autoDetectAndSelectModel(key) {
     if (!key) return;
     const select = document.getElementById("modelSelect");
@@ -231,30 +231,14 @@
         return;
       }
 
-      const geminiModels = data.models
+      // Filter STRICTLY to models that have 'lite' in their identifier
+      const allLiteModels = data.models
         .map(m => m.name.replace("models/", ""))
-        .filter(name => name.includes("gemini") && !name.includes("embedding") && !name.includes("aqa"));
-
-      const versionMap = {};
-      geminiModels.forEach(name => {
-        const match = name.match(/gemini-(\d+(?:\.\d+)?)/);
-        if (match) {
-          const ver = parseFloat(match[1]);
-          if (!versionMap[ver]) versionMap[ver] = [];
-          versionMap[ver].push(name);
-        }
-      });
-
-      const sortedVersions = Object.keys(versionMap)
-        .map(Number)
-        .sort((a, b) => b - a);
-
-      // Filter specifically to LITE variants first
-      const liteModels = geminiModels.filter(name => name.toLowerCase().includes("lite"));
+        .filter(name => name.toLowerCase().includes("gemini") && name.toLowerCase().includes("lite") && !name.includes("embedding"));
 
       const liteVersionMap = {};
-      liteModels.forEach(name => {
-        const match = name.match(/gemini-(\d+(?:\.\d+)?)/);
+      allLiteModels.forEach(name => {
+        const match = name.match(/gemini-(\d+(?:\.\d+)?)/i);
         if (match) {
           const ver = parseFloat(match[1]);
           if (!liteVersionMap[ver]) liteVersionMap[ver] = [];
@@ -268,7 +252,7 @@
 
       let targetVersion;
       if (sortedLiteVersions.length >= 3) {
-        targetVersion = sortedLiteVersions[2]; // 3rd latest Lite generation
+        targetVersion = sortedLiteVersions[2]; // Exactly 3rd latest generation of Lite
       } else if (sortedLiteVersions.length === 2) {
         targetVersion = sortedLiteVersions[1];
       } else {
@@ -276,25 +260,18 @@
       }
 
       const targetFamily = liteVersionMap[targetVersion] || [];
-      let autoSelectedModel = targetFamily[0] || (liteModels.length > 0 ? liteModels[0] : "gemini-2.5-flash-lite");
-      const targetFamily = versionMap[targetVersion] || [];
-
-      let autoSelectedModel = targetFamily.find(m => m.includes("lite") && m.includes("flash")) 
-        || targetFamily.find(m => m.includes("lite"))
-        || targetFamily.find(m => m.includes("flash")) 
-        || targetFamily[0]
-        || "gemini-2.5-flash-lite";
+      let autoSelectedModel = targetFamily[0] || (allLiteModels.length > 0 ? allLiteModels[0] : "gemini-2.5-flash-lite");
 
       select.innerHTML = "";
       
       const optAuto = document.createElement("option");
       optAuto.value = autoSelectedModel;
-      optAuto.textContent = `${autoSelectedModel} (Auto-Selected: 3rd-to-Latest Lite)`;
+      optAuto.textContent = `${autoSelectedModel} (Auto-Selected: 3rd-Latest Lite)`;
       optAuto.selected = true;
       select.appendChild(optAuto);
 
-      geminiModels
-        .filter(m => m !== autoSelectedModel && (m.includes("flash") || m.includes("lite")))
+      allLiteModels
+        .filter(m => m !== autoSelectedModel)
         .forEach(m => {
           const opt = document.createElement("option");
           opt.value = m;
@@ -425,45 +402,48 @@
 
     const btn = document.getElementById("processBtn");
     btn.disabled = true;
-    btn.innerText = "Analyzing Boundaries & Packaging Architecture...";
+    btn.innerText = "Scanning Packaging Vectors & Structural Boundaries...";
 
     try {
       const detectPrompt = `
-      You are an expert computer vision system for digital packaging and trademark de-identification.
-      Analyze this product packaging image with forensic precision.
+      You are an expert AI vision system auditing retail product imagery for absolute compliance and complete trademark suppression.
+      Inspect this packaging image with zero-tolerance precision.
 
-      STAGE 1: VISUAL AUDIT & SURFACE RECONNAISSANCE
-      Before assigning coordinates, inspect the packaging surface and identify:
-      1. All trademarked brand names, logos, cursive lettering, emblems, and mascot silhouettes.
-      2. Outermost script flourishes (e.g., trailing letter tails like 'e' on cursive logos) and edge typography.
-      3. Regulatory, health, or promotional claim strips (e.g. 'Eliminates Odors by Killing 99.9%...', 'Kills Cold & Flu Viruses', scent badges with ™/®).
-      4. Physical packaging seams: spray cap collars, nozzle shoulders, bottom multipack wraps, label die-cut seams, and outer bottle contours.
+      STAGE 1: VISUAL RECONNAISSANCE & INK AUDITING
+      1. Locate all primary brand trademarks, cursive signatures, logos, circular emblems, and mascot silhouettes.
+      2. Locate all secondary claim lines, including scientific testing strips ('SCIENTIFICALLY PROVEN'), germ/virus health claims ('KILLS 99.9%', 'KILLS COLD, FLU & VIRUSES'), and registered scent marks.
+      3. Locate physical structural boundaries: colored plastic cap collars, neck seams, bottom multipack cardboard wraps, and container silhouettes.
 
-      STAGE 2: VISUAL BOUNDING BOXES (MULTI-BOX DEDICATED COVERAGE)
-      Do NOT try to squeeze everything into a single imperfect box. Return MULTIPLE distinct, dedicated bounding boxes [ymin, xmin, ymax, xmax] (integers 0 to 1000) ensuring ZERO residual elements remain:
+      STAGE 2: VISUAL BOUNDING BOXES (MULTI-BOX PHYSICAL ANCHORING)
+      Return normalized coordinates [ymin, xmin, ymax, xmax] (integers 0 to 1000). Ensure ZERO residual brand ink or claim text peeks through:
 
-      1. MULTI-PACK CYLINDERS & SPRAY CANS:
-         - Return an INDIVIDUAL bounding box for EACH can's front logo, 'AIR', and 'SANITIZER' block (e.g., separate boxes for Can 1, Can 2, and Can 3).
-         - Return DEDICATED EXTRA BOXES for any exposed brand tails, cursive flourishes, or edge graphics (e.g., the trailing script letter 'e' or side label on the outer flanks).
-         - Return a DEDICATED HORIZONTAL STRIP BOX specifically covering the continuous red claim ribbon ('Eliminates Odors by Killing 99.9%...') stretching all the way across from the left can to the right can right above the '3-PACK' footer wrap.
+      1. MULTI-PACK SPRAY CANS (e.g., Febreze, Air Wick):
+         - Vertical Column Masks for EACH Can:
+           * ymin: MUST start directly below the plastic spray trigger/nozzle hood, fully engulfing any top claim lines such as 'SCIENTIFICALLY PROVEN'.
+           * ymax: Must extend down to touch the bottom multipack footer wrap.
+           * Enclose the central cursive brand script, 'AIR', and 'SANITIZER' completely.
+         - Lateral Edge Extensions: The outermost flanks of Can 1 (left) and Can 3 (right) must fully enclose trailing flourishes (such as the letter 'e') and side label curves.
+         - Bottom Claim Strip: Return a dedicated wide horizontal strip covering the red 'Eliminates Odors by Killing 99.9%...' banner immediately above the '3-PACK' wrap.
 
-     2. LIQUID JUGS & ASYMMETRICAL BOTTLES:
-         - Main label box: 
-           * Top boundary (ymin): MUST start directly at the dark blue plastic neck collar (to submerge the top arched 'COLD, FLU & VIRUSES' text).
-           * Bottom boundary (ymax): Extend down across 'SANITIZER' with 100% opacity, stopping cleanly above 'CRISP LINEN SCENT' (keep 'LAUNDRY' visible).
-         - DEDICATED FLANK BADGE BOX:
-           * For any red starburst/claim badge ('KILLS 99.9%') on the left flank, return a separate box spanning horizontally from the outer edge of the bottle (xmin: 0) into the label.
+      2. LIQUID JUGS & ASYMMETRICAL BOTTLES (e.g., Lysol, Clorox):
+         - Main Upper Label Mask:
+           * ymin: MUST anchor directly to the bottom edge of the dark blue neck collar, fully covering any arched header text ('KILLS COLD, FLU & VIRUSES').
+           * Enclose the diagonal brand script and 'SANITIZER'.
+           * Stop cleanly above 'CRISP LINEN SCENT' and keep 'LAUNDRY' and bottle capacity ('90 FL OZ') clean.
+         - Dedicated Flank Burst Badge Mask:
+           * For any red scalloped claim burst ('KILLS 99.9%') on the left flank, return a dedicated box.
+           * CRITICAL: Set xmin to 0 (hard left canvas border) so that every single red scalloped tooth is completely submerged.
 
-      3. POUCHES & BOXES:
-         - Mask primary circular emblems, secondary co-brand clusters (e.g., 'plus OxiClean / ODOR BLASTERS'), and corner scent badges completely.
+      3. POUCHES & BOXES (e.g., Arm & Hammer, Tide):
+         - Mask top circular heritage emblems, middle co-brand clusters (e.g., 'plus OxiClean / ODOR BLASTERS'), and corner trademarked scent badges.
 
-      WHITELIST (NEVER MASK):
-      - Volume/count indicators ('72 PAKS', '90 FL OZ', '3-PACK 10 Fl.Oz Each', '16 oz', '8 oz').
-      - Generic category words: 'LAUNDRY', 'MOIST', 'SHAMPOO', 'CONDITIONER', 'DETANGLER', '5 in 1 POWER PAKS', 'Simple Fresh Scent'.
-      - Bottom footer wraps, base illustrations, and physical packaging handles.
+      WHITELIST (DO NOT MASK):
+      - Volume and count indicators ('72 PAKS', '90 FL OZ', '3-PACK 10 Fl.Oz Each', '16 oz', '8 oz').
+      - Generic product categories: 'LAUNDRY', 'MOIST', 'SHAMPOO', 'CONDITIONER', 'DETANGLER', '5 in 1 POWER PAKS', 'Simple Fresh Scent'.
+      - Bottom graphics, clothes illustrations, and multipack cardboard wraps.
 
-      STAGE 3: COMPLIANT TITLE & BANNER PLACEMENT
-      - title: [Count/Volume] + [Generic Category] + [Key Safe Features] + [Generic Scent]. (No brand words).
+      STAGE 3: COMPLIANT GENERIC TITLE & BANNER GUIDANCE
+      - title: [Count/Volume] + [Generic Product Category] + [Key Safe Features] + [Generic Scent if applicable].
       - banner_placement_suggestions: 2-3 precise physical location directions for placing manual cover stickers/ribbons.
 
       Return ONLY valid JSON matching this schema:
@@ -473,7 +453,7 @@
           "packaging_anchors_used": "..."
         },
         "boxes": [[ymin, xmin, ymax, xmax]],
-        "recommended_margin_pct": 16,
+        "recommended_margin_pct": 18,
         "suggested_title": "...",
         "banner_placement_suggestions": ["..."]
       }
@@ -501,7 +481,7 @@
         aiRecommendedMargin = parseFloat(parsed.recommended_margin_pct) / 100;
         document.getElementById("paddingLabel").textContent = `Mask Margin (Auto: ${parsed.recommended_margin_pct}%)`;
       } else {
-        aiRecommendedMargin = 0.16;
+        aiRecommendedMargin = 0.18;
       }
 
       renderAllMasks();
@@ -537,7 +517,7 @@
     }
   });
 
-  // Pure scale-invariant relative expansion with perimeter edge-snapping
+  // Relative expansion with perimeter edge-snapping for flank elements
   function expandBoxDynamically(box, marginRatio) {
     const [ymin, xmin, ymax, xmax] = box;
     const w = xmax - xmin;
@@ -551,16 +531,14 @@
     let newYmax = Math.min(1000, ymax + padY);
     let newXmax = Math.min(1000, xmax + padX);
 
-    // Perimeter Edge Snap: If any mask approaches the outer flanks (< 90 or > 910),
-    // firmly snap it to the canvas border so edge teeth/flourishes never leak through feathering
-    if (newXmin <= 90) newXmin = 0;
-    if (newXmax >= 910) newXmax = 1000;
-    if (newYmin <= 60) newYmin = 0;
+    // Perimeter Edge Snap: Protruding badges within 10% of the canvas borders snap completely to outer borders
+    if (newXmin <= 100) newXmin = 0;
+    if (newXmax >= 900) newXmax = 1000;
+    if (newYmin <= 50) newYmin = 0;
 
     return [newYmin, newXmin, newYmax, newXmax];
   }
 
-  // Resolution-invariant scale factor based on packaging canvas diagonal
   function getPackagingScale() {
     const diag = Math.sqrt(canvas.width * canvas.width + canvas.height * canvas.height);
     return Math.max(0.6, diag / 1400);
@@ -620,7 +598,6 @@
     const paddingRatio = paddingVal === "auto" ? aiRecommendedMargin : parseFloat(paddingVal);
     const enableHashShield = document.getElementById("hashShieldSelect").value === "true";
 
-    // Dynamic relative expansion: preserves exact boundaries without artificial width ceilings
     const processedBoxes = rawAiBoxes.map(b => expandBoxDynamically(b, paddingRatio));
     const allBoxes = [...processedBoxes, ...manualBoxes];
 
@@ -638,7 +615,7 @@
       } else if (mode === "solid") {
         applySolidTape(x, y, w, h);
       } else {
-        applyFrostedDiffusion(x, y, w, h);
+        applyFrostedDiffusion(x, y, w, h, xmin === 0);
       }
     });
 
@@ -650,7 +627,7 @@
   }
 
   // Scale-Invariant Radial Diffusion with Dominant Color Tint Underlay
-  function applyFrostedDiffusion(x, y, w, h) {
+  function applyFrostedDiffusion(x, y, w, h, isBorderSnapped = false) {
     if (w <= 0 || h <= 0) return;
     const rw = Math.max(1, Math.round(w));
     const rh = Math.max(1, Math.round(h));
@@ -669,7 +646,7 @@
     off.height = srcH;
     const offCtx = off.getContext("2d");
 
-    // Sample local dominant color to suppress white letter contrast punch-through
+    // Sample local dominant color to suppress white letter contrast bleed
     const sampleCanvas = document.createElement("canvas");
     sampleCanvas.width = 1;
     sampleCanvas.height = 1;
@@ -689,8 +666,8 @@
     offCtx.drawImage(mini, 0, 0, mini.width, mini.height, 0, 0, srcW, srcH);
     offCtx.imageSmoothingEnabled = true;
 
-    // Harmonize with packaging color tone
-    offCtx.fillStyle = `rgba(${r}, ${g}, ${b}, 0.50)`;
+    // Tone match with dominant background
+    offCtx.fillStyle = `rgba(${r}, ${g}, ${b}, 0.52)`;
     offCtx.fillRect(0, 0, srcW, srcH);
 
     // Deep Gaussian diffusion
@@ -704,7 +681,7 @@
     const offsetX = x - srcX;
     const offsetY = y - srcY;
 
-    // Composite with soft boundary falloff
+    // Composite with soft perimeter feathering
     const patchCanvas = document.createElement("canvas");
     patchCanvas.width = rw;
     patchCanvas.height = rh;
@@ -718,7 +695,14 @@
 
     const feather = Math.max(6, Math.round(Math.min(rw, rh) * 0.10));
     mCtx.fillStyle = "#ffffff";
-    mCtx.fillRect(feather, feather, rw - feather * 2, rh - feather * 2);
+    
+    // If the box is snapped flush to the left border, do NOT dissolve the left edge away
+    if (isBorderSnapped) {
+      mCtx.fillRect(0, feather, rw - feather, rh - feather * 2);
+    } else {
+      mCtx.fillRect(feather, feather, rw - feather * 2, rh - feather * 2);
+    }
+    
     mCtx.filter = `blur(${feather}px)`;
     mCtx.drawImage(maskCanvas, 0, 0);
 
@@ -848,7 +832,8 @@
     const candidateModels = [
       initialModel,
       "gemini-2.5-flash-lite",
-      "gemini-2.5-flash",
+      "gemini-2.0-flash-lite",
+      "gemini-1.5-flash-8b",
       "gemini-flash-latest"
     ].filter((v, i, a) => v && a.indexOf(v) === i);
 
