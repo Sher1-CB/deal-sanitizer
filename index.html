@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Deal Sanitizer & Auto-Masker v1.2.07</title>
+  <title>Deal Sanitizer & Auto-Masker v1.2.08</title>
   <style>
     body { 
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
@@ -98,13 +98,13 @@
 </head>
 <body>
 
-<div class="app-version-fixed">v1.2.07</div>
+<div class="app-version-fixed">v1.2.08</div>
 
 <div class="container">
   <div class="card full-width">
     <h2>
       Automated Deal Asset Sanitizer 
-      <span class="version-header-badge">v1.2.07</span>
+      <span class="version-header-badge">v1.2.08</span>
     </h2>
     
     <label>Gemini API Key</label>
@@ -412,13 +412,13 @@
       3. Regulatory, health, or promotional claim strips (e.g. 'Eliminates Odors by Killing 99.9%...', 'Kills Cold & Flu Viruses', scent badges with ™/®).
       4. Physical packaging seams: spray cap collars, nozzle shoulders, bottom multipack wraps, label die-cut seams, and outer bottle contours.
 
-      STAGE 2: VISUAL BOUNDING BOXES (PHYSICAL ANCHORING)
-      Return normalized coordinates [ymin, xmin, ymax, xmax] (integers 0 to 1000) adhering strictly to physical packaging landmarks:
+      STAGE 2: VISUAL BOUNDING BOXES (MULTI-BOX DEDICATED COVERAGE)
+      Do NOT try to squeeze everything into a single imperfect box. Return MULTIPLE distinct, dedicated bounding boxes [ymin, xmin, ymax, xmax] (integers 0 to 1000) ensuring ZERO residual elements remain:
 
       1. MULTI-PACK CYLINDERS & SPRAY CANS:
-         - Top boundary (ymin): Anchor directly to the bottom line of the plastic spray nozzles.
-         - Bottom boundary (ymax): Extend downward until it FIRMLY OVERLAPS the top edge of the footer wrap/card (e.g., where '3-PACK' starts). The red claim line MUST be fully submerged inside the box.
-         - Left/Right boundaries (xmin/xmax): Stretch from the outermost physical silhouette of the leftmost can to the outermost physical silhouette of the rightmost can, completely swallowing all cursive flourishes (including any trailing letters like 'e') and side graphics.
+         - Return an INDIVIDUAL bounding box for EACH can's front logo, 'AIR', and 'SANITIZER' block (e.g., separate boxes for Can 1, Can 2, and Can 3).
+         - Return DEDICATED EXTRA BOXES for any exposed brand tails, cursive flourishes, or edge graphics (e.g., the trailing script letter 'e' or side label on the outer flanks).
+         - Return a DEDICATED HORIZONTAL STRIP BOX specifically covering the continuous red claim ribbon ('Eliminates Odors by Killing 99.9%...') stretching all the way across from the left can to the right can right above the '3-PACK' footer wrap.
 
       2. LIQUID JUGS & ASYMMETRICAL BOTTLES:
          - Top boundary: Anchor near the neck/shoulder seam to engulf arched claims ('KILLS COLD, FLU...').
