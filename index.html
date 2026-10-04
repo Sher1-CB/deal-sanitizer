@@ -110,9 +110,9 @@
     <label>Gemini API Key</label>
     <input type="password" id="apiKey" placeholder="AIzaSy...">
 
-    <label id="modelSelectLabel">Gemini Model (Detecting available models...)</label>
+    <label id="modelSelectLabel">Gemini Model (Detecting live models...)</label>
     <select id="modelSelect">
-      <option value="gemini-2.5-flash-lite" selected>gemini-2.5-flash-lite (Default)</option>
+      <option value="gemini-2.5-flash-lite" selected>gemini-2.5-flash-lite (Connecting...)</option>
     </select>
   </div>
 
@@ -216,8 +216,7 @@
   const savedKey = localStorage.getItem("deal_gemini_key");
   if (savedKey) keyInput.value = savedKey;
 
-  // DYNAMIC MODEL SELECTION: 100% dynamic, zero hardcoding.
-  // Queries live API, groups by generation version, and locks to the 3rd-latest Flash/Lite tier.
+  // DYNAMIC MODEL SELECTION: 100% dynamic, queries live API, groups by version, locks onto 3rd-latest fast tier
   async function autoDetectAndSelectModel(key) {
     if (!key) return;
     const select = document.getElementById("modelSelect");
@@ -232,7 +231,7 @@
         return;
       }
 
-      // 1. Filter to Flash and Lite speed tiers only
+      // Filter to generation-capable fast models, excluding non-generative endpoints
       const fastModels = data.models
         .map(m => m.name.replace("models/", ""))
         .filter(name => {
@@ -243,7 +242,7 @@
                  !lower.includes("aqa");
         });
 
-      // 2. Extract numeric versions dynamically (e.g. 3.7, 3.5, 3.1, 2.5, 2.0, 1.5)
+      // Extract numeric version keys (e.g. 3.7, 3.6, 3.1, 2.5, 2.0, 1.5)
       const versionMap = {};
       fastModels.forEach(name => {
         const match = name.match(/gemini-(\d+(?:\.\d+)?)/i);
@@ -254,12 +253,12 @@
         }
       });
 
-      // 3. Sort version generations in descending order (newest first)
+      // Sort unique version numbers descending (newest first)
       const sortedGenerations = Object.keys(versionMap)
         .map(Number)
         .sort((a, b) => b - a);
 
-      // 4. Select the 3rd-to-latest generation (index 2), falling back if fewer exist
+      // Select the 3rd-to-latest generation
       let targetGenIndex = 0;
       if (sortedGenerations.length >= 3) {
         targetGenIndex = 2; // 3rd to latest
@@ -270,12 +269,11 @@
       const targetVersion = sortedGenerations[targetGenIndex];
       const targetFamily = versionMap[targetVersion] || fastModels;
 
-      // 5. Prefer Lite within that target generation for maximum speed, then Flash
+      // Prefer Lite if available in that target generation, then Flash
       let autoSelectedModel = targetFamily.find(m => m.toLowerCase().includes("lite")) 
         || targetFamily.find(m => m.toLowerCase().includes("flash")) 
         || targetFamily[0];
 
-      // Populate dropdown dynamically with live detected models
       select.innerHTML = "";
       
       const optAuto = document.createElement("option");
@@ -431,20 +429,23 @@
       STAGE 2: VISUAL BOUNDING BOXES (MULTI-BOX PHYSICAL ANCHORING)
       Return normalized coordinates [ymin, xmin, ymax, xmax] (integers 0 to 1000). Ensure ZERO residual brand ink or claim text peeks through:
 
-      1. MULTI-PACK SPRAY CANS:
-         - Return an INDIVIDUAL vertical bounding box for EACH spray can.
-         - Top (ymin): Directly beneath the nozzle spray hood.
-         - Bottom (ymax): Must extend ALL THE WAY DOWN to touch the '3-PACK' bottom wrap.
-         - Must completely conceal: brand logos, 'AIR', 'SANITIZER', and the red claim strip.
+      1. MULTI-PACK SPRAY CANS (e.g., Febreze, Air Wick):
+         - Vertical Column Masks for EACH Can:
+           * ymin: MUST start directly below the plastic spray trigger/nozzle hood, fully engulfing any top claim lines such as 'SCIENTIFICALLY PROVEN'.
+           * ymax: MUST extend ALL THE WAY DOWN to touch the '3-PACK' bottom wrap.
+           * Enclose the central cursive brand script, 'AIR', and 'SANITIZER' completely.
+         - Lateral Edge Extensions: The outermost flanks of Can 1 (left) and Can 3 (right) must fully enclose trailing flourishes (such as the letter 'e') and side label curves.
+         - Bottom Claim Strip: Return a dedicated wide horizontal strip covering the red 'Eliminates Odors by Killing 99.9%...' banner immediately above the '3-PACK' wrap.
 
-      2. LIQUID JUGS:
-         - Main Label Mask:
-           * Top (ymin): Anchor directly to the dark blue plastic neck collar.
-           * Bottom (ymax): Must completely enclose the word 'SANITIZER'.
-           * Keep 'LAUNDRY' legible above, and 'CRISP LINEN SCENT' legible below.
-         - Left Flank Badge:
-           * Set xmin to 0 so the mask extends completely off the left edge of the canvas.
-           
+      2. LIQUID JUGS & ASYMMETRICAL BOTTLES (e.g., Lysol, Clorox):
+         - Main Upper Label Mask:
+           * ymin: Anchor directly to the dark blue plastic neck collar (covering arched 'KILLS COLD & FLU' claims).
+           * ymax: MUST completely enclose the word 'SANITIZER'.
+           * Keep 'LAUNDRY' and 'CRISP LINEN SCENT' legible above/below.
+         - Dedicated Left Flank Badge Mask:
+           * The red starburst claim badge on the far-left outer edge ('KILLS 99.9%') MUST have its own independent box.
+           * Set xmin to 0 (hard left canvas border) so that every single red scalloped tooth is completely submerged.
+
       3. POUCHES & BOXES (e.g., Arm & Hammer, Tide):
          - Mask top circular heritage emblems, middle co-brand clusters (e.g., 'plus OxiClean / ODOR BLASTERS'), and corner trademarked scent badges.
 
@@ -479,19 +480,18 @@
         }],
         generationConfig: {
           temperature: 0.1,
-          responseMimeType: "application/json",
-          maxOutputTokens: 2048
-          }
+          responseMimeType: "application/json"
         }
       }, selectedModel);
 
       let rawText = detectData.candidates[0]?.content?.parts[0]?.text || "{}";
       rawText = rawText.replace(/```json/g, "").replace(/```/g, "").trim();
       
-      // Auto-close open JSON objects if truncated
+      // Auto-heal truncated JSON if response stream cuts off
       if (rawText.lastIndexOf("}") < rawText.lastIndexOf("{")) {
         rawText += "}";
       }
+
       let parsed = JSON.parse(rawText);
 
       rawAiBoxes = Array.isArray(parsed) ? parsed : (parsed.boxes || []);
@@ -542,7 +542,6 @@
     const w = xmax - xmin;
     const h = ymax - ymin;
     
-    // Balanced padding
     const padX = Math.round(w * marginRatio);
     const padY = Math.round(h * marginRatio);
 
@@ -551,14 +550,14 @@
     let newYmax = Math.min(1000, ymax + padY);
     let newXmax = Math.min(1000, xmax + padX);
 
-    // Edge-snapping: if the box is within 8% of image borders, seal it to the frame
-    if (newXmin <= 80) newXmin = 0;
-    if (newXmax >= 920) newXmax = 1000;
+    // Perimeter Edge Snap: Protruding badges within 10% of canvas borders snap completely to outer frame
+    if (newXmin <= 100) newXmin = 0;
+    if (newXmax >= 900) newXmax = 1000;
     if (newYmin <= 50) newYmin = 0;
 
     return [newYmin, newXmin, newYmax, newXmax];
   }
-  
+
   function getPackagingScale() {
     const diag = Math.sqrt(canvas.width * canvas.width + canvas.height * canvas.height);
     return Math.max(0.6, diag / 1400);
@@ -646,7 +645,7 @@
     document.getElementById("downloadBtn").style.display = "inline-block";
   }
 
-  // Scale-Invariant Radial Diffusion with Dominant Color Tint Underlay
+  // Scale-Invariant Radial Diffusion with Uniform Cluster Color Tinting
   function applyFrostedDiffusion(x, y, w, h, isBorderSnapped = false) {
     if (w <= 0 || h <= 0) return;
     const rw = Math.max(1, Math.round(w));
@@ -672,11 +671,11 @@
     sampleCanvas.height = 1;
     const sCtx = sampleCanvas.getContext("2d");
     
-    // Sample from the top 35% of the box where packaging base color is cleanest
+    // Sample from top 35% of the box where packaging base color is cleanest
     sCtx.drawImage(loadedImage, x, y, rw, Math.max(2, Math.round(rh * 0.35)), 0, 0, 1, 1);
     let [r, g, b] = sCtx.getImageData(0, 0, 1, 1).data;
 
-    // Prevent oversaturated dark patches: if luminance is too low, lift it to packaging ambient
+    // Prevent oversaturated dark patches: if luminance is too low, lift to packaging ambient
     const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
     if (luminance < 75) {
       r = Math.min(240, r + 60);
