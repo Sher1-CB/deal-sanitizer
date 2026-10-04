@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Deal Sanitizer & Auto-Masker v1.0.19</title>
+  <title>Deal Sanitizer & Auto-Masker v1.0.20</title>
   <style>
     body { 
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
@@ -98,13 +98,13 @@
 </head>
 <body>
 
-<div class="app-version-fixed">v1.0.19</div>
+<div class="app-version-fixed">v1.0.20</div>
 
 <div class="container">
   <div class="card full-width">
     <h2>
       Automated Deal Asset Sanitizer 
-      <span class="version-header-badge">v1.0.19</span>
+      <span class="version-header-badge">v1.0.20</span>
     </h2>
     
     <label>Gemini API Key</label>
@@ -134,7 +134,7 @@
 
     <label>Masking Visual Style</label>
     <select id="maskMode">
-      <option value="blur" selected>Zero-Leak Frosted Blur (100% Opaque)</option>
+      <option value="blur" selected>Zero-Leak Frosted Blur (100% Solid-Base)</option>
       <option value="pixelate">Mosaic Pixelation</option>
       <option value="solid">Clean Dark Tape</option>
     </select>
@@ -321,7 +321,7 @@
 
     const btn = document.getElementById("processBtn");
     btn.disabled = true;
-    btn.innerText = "Analyzing Landmarks & Trademarks...";
+    btn.innerText = "Analyzing Surfaces & Trademarks...";
 
     try {
       const detectPrompt = `
@@ -331,30 +331,29 @@
       Scan the ENTIRE packaging surface. Return normalized coordinates [ymin, xmin, ymax, xmax] (0 to 1000 integers) covering:
       
       1. CRITICAL: BRAND NAMES VS. BENEFIT WORDS
-         - DO MASK: The actual manufacturer brand name, parent company, or mascot emblem (e.g., 'aussie', 'aussie KIDS', kangaroo animal silhouette, 'Lysol', 'Clorox', 'Pantene', 'Dove'). Notice that brand names may be printed in subtle, tone-on-tone, or darker low-contrast typography on the upper shoulder/chest of bottles.
-         - NEVER MASK generic product line words, benefit descriptors, or product types (e.g. 'MOIST', 'SHAMPOO', 'CONDITIONER', 'DETANGLER', 'HYDRATING', 'VOLUME', 'CLEAN', 'REPAIR'). These MUST remain completely visible!
+         - DO MASK: All primary brand names, mascots, and logos ('aussie', kangaroo silhouette, 'Arm & Hammer', 'Clorox', 'Lysol'). Look closely for subtle, low-contrast, or tone-on-tone brand typography on bottle shoulders.
+         - NEVER MASK: Generic product descriptors or benefits ('MOIST', 'SHAMPOO', 'CONDITIONER', 'DETANGLER', 'POWER PAKS', '5 in 1').
       
-      2. PHYSICAL LANDMARKS & EMBLEMS:
-         - For aerosol cans or bottles: Anchor upper boundaries directly below cap/nozzle seams.
-         - For logos inside backing crests or seals: Swallow the entire colored background shape.
+      2. SECONDARY TRADEMARKS & SCENT TAGLINES (MANDATORY):
+         - Co-brands & secondary logos: 'OxiClean', 'ODOR BLASTERS', 'stain fighters', 'Febreze'. The bounding box over middle banners MUST extend all the way horizontally through 'ODOR BLASTERS'.
+         - Trademarked scent badges carrying ™ or ®: e.g., 'fresh burst™' in the lower corner MUST be masked with its own box.
       
-      3. SECONDARY TRADEMARKS & RESTRICTED CLAIMS:
-         - Secondary ingredient brands ('OxiClean', 'CLOROX', 'Febreze').
-         - Slogans/scents carrying ™ or ®.
-         - Medical/sanitation claims ('BACTERIA', 'VIRUSES', 'SANITIZER', 'DISINFECTANT', 'KILLING 99.9%').
-         - Pathogen/virus visual illustrations (spiky balls).
+      3. PHYSICAL LANDMARKS & EMBLEMS:
+         - Circular emblems (e.g. Arm & Hammer crest): Mask must swallow the ENTIRE colored outer ring and radial burst perimeter.
+         - Bottles/cans: Anchor upper boundary directly beneath cap/nozzle seams.
+         - Pathogens/claims: 'BACTERIA', 'VIRUSES', 'SANITIZER', 'DISINFECTANT', 'KILLING 99.9%', and spiky microbe graphics.
 
       CRITICAL WHITELIST (WHAT TO KEEP VISIBLE - DO NOT MASK):
-      - Volume and pack count ('16 oz', '8 oz', '90 FL OZ', '3-PACK', '72 PAKS').
-      - Product types/descriptors ('MOIST', 'SHAMPOO', 'CONDITIONER', 'DETANGLER', 'Crisp Linen').
+      - Volume and count specs ('16 oz', '8 oz', '90 FL OZ', '72 PAKS', '3-PACK').
+      - Product types/descriptors ('MOIST', 'SHAMPOO', 'CONDITIONER', 'DETANGLER', '5 in 1 POWER PAKS').
       - Character illustrations and background art.
 
       TASK 2: PACKAGING GEOMETRY & RECOMMENDED MARGIN
-      Evaluate packaging curvature. Select best margin from: [10, 12.5, 15, 17.5, 20].
+      Select best margin from: [10, 12.5, 15, 17.5, 20].
 
       TASK 3: COMPLIANT GENERIC TITLE
       Generate a brand-free, trademark-free title incorporating verified volume/count and generic product type.
-      Example: "3-Piece Kids Moisturizing Hair Care Set (16 oz Shampoo, Conditioner & 8 oz Detangler)"
+      Example: "72-Count 5-in-1 Laundry Detergent Power Paks - Fresh Scent"
 
       TASK 4: POSTER SUGGESTIONS
       Provide 2 brief tips confirming what was masked and verifying size/count retention.
@@ -404,7 +403,7 @@
       list.innerHTML = "";
 
       const defaultTip = document.createElement("li");
-      defaultTip.innerHTML = `<b>Targeting Verified:</b> Brand marks and mascots masked; generic product categories ('Moist Shampoo') kept visible.`;
+      defaultTip.innerHTML = `<b>Zero-Leak Underwrite Active:</b> Bounding boxes overwrite base image data with solid color fills to prevent alpha transparency leaks.`;
       list.appendChild(defaultTip);
 
       if (parsed.suggestions && Array.isArray(parsed.suggestions)) {
@@ -512,51 +511,49 @@
     document.getElementById("downloadBtn").style.display = "inline-block";
   }
 
-  // 100% Opaque Padded Mosaic Blur Pipeline
+  // 100% Opaque Solid-Base Frosted Blur Pipeline
   function applyZeroLeakBlur(x, y, w, h) {
     if (w <= 0 || h <= 0) return;
-
     const rw = Math.max(1, Math.round(w));
     const rh = Math.max(1, Math.round(h));
 
-    // Internal safety gutter to ensure Gaussian blur never fades to transparent at borders
-    const pad = 40;
-    const srcX = Math.max(0, x - pad);
-    const srcY = Math.max(0, y - pad);
-    const srcW = Math.min(loadedImage.naturalWidth - srcX, rw + pad * 2);
-    const srcH = Math.min(loadedImage.naturalHeight - srcY, rh + pad * 2);
+    // 1. Calculate 100% solid, fully opaque color from local packaging area
+    const avgCanvas = document.createElement("canvas");
+    avgCanvas.width = 1;
+    avgCanvas.height = 1;
+    const avgCtx = avgCanvas.getContext("2d");
+    avgCtx.drawImage(loadedImage, x, y, rw, rh, 0, 0, 1, 1);
+    const p = avgCtx.getImageData(0, 0, 1, 1).data;
+    const solidColor = `rgb(${p[0]}, ${p[1]}, ${p[2]})`;
 
-    const off = document.createElement("canvas");
-    off.width = srcW;
-    off.height = srcH;
-    const offCtx = off.getContext("2d");
+    ctx.save();
 
-    // 1. Downscale to 3% to mathematically obliterate all character glyphs
-    const scale = 0.03;
-    const mini = document.createElement("canvas");
-    mini.width = Math.max(1, Math.floor(srcW * scale));
-    mini.height = Math.max(1, Math.floor(srcH * scale));
-    const miniCtx = mini.getContext("2d");
-    miniCtx.drawImage(loadedImage, srcX, srcY, srcW, srcH, 0, 0, mini.width, mini.height);
+    // 2. OBLITERATE: Overwrite the target area on the main canvas with solid color.
+    // This physically erases the underlying typography so 0% text can show through.
+    ctx.fillStyle = solidColor;
+    ctx.fillRect(x, y, rw, rh);
 
-    // 2. Re-expand pixelated blocks (100% opaque base)
-    offCtx.imageSmoothingEnabled = false;
-    offCtx.drawImage(mini, 0, 0, mini.width, mini.height, 0, 0, srcW, srcH);
-    offCtx.imageSmoothingEnabled = true;
+    // 3. Build a low-frequency 12-sample mosaic from the source to capture lighting/gradients
+    const blockW = Math.max(3, Math.floor(rw / 12));
+    const blockH = Math.max(3, Math.floor(rh / 12));
+    const mosaic = document.createElement("canvas");
+    mosaic.width = blockW;
+    mosaic.height = blockH;
+    const mCtx = mosaic.getContext("2d");
+    mCtx.drawImage(loadedImage, x, y, rw, rh, 0, 0, blockW, blockH);
 
-    // 3. Heavy Gaussian blur pass on the opaque mosaic
-    const blurred = document.createElement("canvas");
-    blurred.width = srcW;
-    blurred.height = srcH;
-    const bCtx = blurred.getContext("2d");
-    const radius = Math.max(28, Math.round(rw * 0.15));
-    bCtx.filter = `blur(${radius}px)`;
-    bCtx.drawImage(off, 0, 0);
+    // 4. Bilinear upscale the mosaic over the solid fill
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    ctx.globalAlpha = 0.85;
+    ctx.drawImage(mosaic, 0, 0, blockW, blockH, x, y, rw, rh);
 
-    // 4. Stamp exact target center onto base canvas (completely opaque, zero spill)
-    const offsetX = x - srcX;
-    const offsetY = y - srcY;
-    ctx.drawImage(blurred, offsetX, offsetY, rw, rh, x, y, rw, rh);
+    // 5. Heavy Gaussian blur pass strictly over the target rectangle
+    ctx.filter = "blur(14px)";
+    ctx.globalAlpha = 0.95;
+    ctx.drawImage(canvas, x, y, rw, rh, x, y, rw, rh);
+
+    ctx.restore();
   }
 
   function applyPixelation(x, y, w, h) {
