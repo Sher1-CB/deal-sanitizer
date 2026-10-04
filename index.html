@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Deal Sanitizer & Auto-Masker v1.2.14</title>
+  <title>Deal Sanitizer & Auto-Masker v1.2.15</title>
   <style>
     body { 
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
@@ -98,13 +98,13 @@
 </head>
 <body>
 
-<div class="app-version-fixed">v1.2.14</div>
+<div class="app-version-fixed">v1.2.15</div>
 
 <div class="container">
   <div class="card full-width">
     <h2>
       Automated Deal Asset Sanitizer 
-      <span class="version-header-badge">v1.2.14</span>
+      <span class="version-header-badge">v1.2.15</span>
     </h2>
     
     <label>Gemini API Key</label>
@@ -216,14 +216,15 @@
   const savedKey = localStorage.getItem("deal_gemini_key");
   if (savedKey) keyInput.value = savedKey;
 
-  // DYNAMIC MODEL SELECTION: Selects stable production models (avoids coordinate-drifting previews)
+  // DYNAMIC MODEL SELECTION: 100% dynamic, zero hardcoding.
+  // Queries live API, groups by generation version, and locks to the 3rd-latest Flash/Lite tier.
   async function autoDetectAndSelectModel(key) {
     if (!key) return;
     const select = document.getElementById("modelSelect");
     const label = document.getElementById("modelSelectLabel");
 
     try {
-      label.textContent = "Gemini Model (Detecting stable models...)";
+      label.textContent = "Gemini Model (Detecting live model generations...)";
       const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`);
       const data = await res.json();
       if (!data.models || !Array.isArray(data.models)) {
@@ -231,35 +232,59 @@
         return;
       }
 
-      // Filter out preview/experimental builds to ensure stable coordinate bounding
-      const stableModels = data.models
+      // 1. Filter to Flash and Lite speed tiers only
+      const fastModels = data.models
         .map(m => m.name.replace("models/", ""))
         .filter(name => {
           const lower = name.toLowerCase();
           return lower.includes("gemini") && 
-                 (lower.includes("flash") || lower.includes("lite")) && 
-                 !lower.includes("preview") && 
-                 !lower.includes("experimental") &&
+                 (lower.includes("flash") || lower.includes("lite")) &&
                  !lower.includes("embedding") &&
                  !lower.includes("aqa");
         });
 
-      // Prefer high-precision stable Flash/Lite models
-      let autoSelectedModel = stableModels.find(m => m.includes("3.7-flash"))
-        || stableModels.find(m => m.includes("2.5-flash-lite"))
-        || stableModels.find(m => m.includes("2.5-flash"))
-        || stableModels[0]
-        || "gemini-2.5-flash-lite";
+      // 2. Extract numeric versions dynamically (e.g. 3.7, 3.5, 3.1, 2.5, 2.0, 1.5)
+      const versionMap = {};
+      fastModels.forEach(name => {
+        const match = name.match(/gemini-(\d+(?:\.\d+)?)/i);
+        if (match) {
+          const ver = parseFloat(match[1]);
+          if (!versionMap[ver]) versionMap[ver] = [];
+          versionMap[ver].push(name);
+        }
+      });
 
+      // 3. Sort version generations in descending order (newest first)
+      const sortedGenerations = Object.keys(versionMap)
+        .map(Number)
+        .sort((a, b) => b - a);
+
+      // 4. Select the 3rd-to-latest generation (index 2), falling back if fewer exist
+      let targetGenIndex = 0;
+      if (sortedGenerations.length >= 3) {
+        targetGenIndex = 2; // 3rd to latest
+      } else if (sortedGenerations.length === 2) {
+        targetGenIndex = 1; // 2nd to latest
+      }
+
+      const targetVersion = sortedGenerations[targetGenIndex];
+      const targetFamily = versionMap[targetVersion] || fastModels;
+
+      // 5. Prefer Lite within that target generation for maximum speed, then Flash
+      let autoSelectedModel = targetFamily.find(m => m.toLowerCase().includes("lite")) 
+        || targetFamily.find(m => m.toLowerCase().includes("flash")) 
+        || targetFamily[0];
+
+      // Populate dropdown dynamically with live detected models
       select.innerHTML = "";
       
       const optAuto = document.createElement("option");
       optAuto.value = autoSelectedModel;
-      optAuto.textContent = `${autoSelectedModel} (Recommended Stable)`;
+      optAuto.textContent = `${autoSelectedModel} (Auto-Selected: 3rd-Gen Fast)`;
       optAuto.selected = true;
       select.appendChild(optAuto);
 
-      stableModels
+      fastModels
         .filter(m => m !== autoSelectedModel)
         .forEach(m => {
           const opt = document.createElement("option");
@@ -271,7 +296,7 @@
       label.textContent = `Gemini Model (Active: ${autoSelectedModel})`;
 
     } catch (err) {
-      console.warn("Dynamic model auto-detection error; keeping fallbacks:", err);
+      console.warn("Dynamic model auto-detection error:", err);
       label.textContent = "Gemini Model";
     }
   }
@@ -414,15 +439,14 @@
          - Lateral Edge Extensions: The outermost flanks of Can 1 (left) and Can 3 (right) must fully enclose trailing flourishes (such as the letter 'e') and side label curves.
          - Bottom Claim Strip: Return a dedicated wide horizontal strip covering the red 'Eliminates Odors by Killing 99.9%...' banner immediately above the '3-PACK' wrap.
 
-      2. LIQUID JUGS & ASYMMETRICAL BOTTLES (e.g., Lysol, Clorox):
-         - Main Upper Label Mask:
-           * ymin: MUST anchor directly to the bottom edge of the dark blue neck collar, fully covering any arched header text ('KILLS COLD, FLU & VIRUSES').
-           * Enclose the diagonal brand script and 'SANITIZER'.
-           * Stop cleanly above 'CRISP LINEN SCENT' and keep 'LAUNDRY' and bottle capacity ('90 FL OZ') clean.
-         - Dedicated Flank Burst Badge Mask:
-           * For any red scalloped claim burst ('KILLS 99.9%') on the left flank, return a dedicated box.
-           * CRITICAL: Set xmin to 0 (hard left canvas border) so that every single red scalloped tooth is completely submerged.
-
+      2. LIQUID JUGS & ASYMMETRICAL BOTTLES:
+         - Main label box:
+           * MUST start at the blue neck collar and extend down across the arched text, diagonal brand name, and the word 'SANITIZER'.
+           * DO NOT cover 'LAUNDRY' — keep 'LAUNDRY' and '90 FL OZ' legible, but completely conceal 'SANITIZER'.
+         - CRITICAL FLANK BURST BADGE:
+           * The red starburst claim badge on the far-left outer edge ('KILLS 99.9%') MUST have its own dedicated box.
+           * For this badge box, set xmin to 0 so the mask extends completely off the left side of the bottle silhouette.
+           
       3. POUCHES & BOXES (e.g., Arm & Hammer, Tide):
          - Mask top circular heritage emblems, middle co-brand clusters (e.g., 'plus OxiClean / ODOR BLASTERS'), and corner trademarked scent badges.
 
@@ -456,7 +480,10 @@
           ]
         }],
         generationConfig: {
-          temperature: 0.0
+          temperature: 0.0,
+          thinkingConfig: {
+            thinkingBudget: 0
+          }
         }
       }, selectedModel);
 
