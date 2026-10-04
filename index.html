@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Deal Sanitizer & Auto-Masker v1.2.0</title>
+  <title>Deal Sanitizer & Auto-Masker v1.2.5</title>
   <style>
     body { 
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
@@ -98,13 +98,13 @@
 </head>
 <body>
 
-<div class="app-version-fixed">v1.2.0</div>
+<div class="app-version-fixed">v1.2.5</div>
 
 <div class="container">
   <div class="card full-width">
     <h2>
       Automated Deal Asset Sanitizer 
-      <span class="version-header-badge">v1.2.0</span>
+      <span class="version-header-badge">v1.2.5</span>
     </h2>
     
     <label>Gemini API Key</label>
@@ -140,12 +140,11 @@
       <div>
         <label id="paddingLabel">Mask Margin (Padding)</label>
         <select id="paddingSelect">
-          <option value="auto" selected>Auto (AI-Selected: 10%–20%)</option>
+          <option value="auto" selected>Auto (AI-Selected: 15%–25%)</option>
           <option value="0.10">10%</option>
-          <option value="0.125">12.5%</option>
           <option value="0.15">15%</option>
-          <option value="0.175">17.5%</option>
           <option value="0.20">20%</option>
+          <option value="0.25">25%</option>
         </select>
       </div>
       <div>
@@ -204,7 +203,7 @@
 
   let rawAiBoxes = [];
   let manualBoxes = [];
-  let aiRecommendedMargin = 0.15;
+  let aiRecommendedMargin = 0.18;
 
   let isDragging = false;
   let dragStartX = 0;
@@ -232,12 +231,10 @@
         return;
       }
 
-      // Filter to generation-capable multimodal models
       const geminiModels = data.models
         .map(m => m.name.replace("models/", ""))
         .filter(name => name.includes("gemini") && !name.includes("embedding") && !name.includes("aqa"));
 
-      // Group models by generation (e.g., 3.0, 2.5, 2.0, 1.5)
       const versionMap = {};
       geminiModels.forEach(name => {
         const match = name.match(/gemini-(\d+(?:\.\d+)?)/);
@@ -250,13 +247,11 @@
 
       const sortedVersions = Object.keys(versionMap)
         .map(Number)
-        .sort((a, b) => b - a); // e.g. [3.0, 2.5, 2.0]
+        .sort((a, b) => b - a);
 
-      // Identify 2nd to latest generation (falls back to highest if only 1 exists)
       const targetVersion = sortedVersions.length >= 2 ? sortedVersions[1] : sortedVersions[0];
       const targetFamily = versionMap[targetVersion] || [];
 
-      // Find the Lite variant within that target family
       let autoSelectedModel = targetFamily.find(m => m.includes("lite") && m.includes("flash")) 
         || targetFamily.find(m => m.includes("lite"))
         || targetFamily.find(m => m.includes("flash")) 
@@ -294,7 +289,6 @@
     if (val) autoDetectAndSelectModel(val);
   });
 
-  // Run on page load if key is saved
   if (savedKey) {
     autoDetectAndSelectModel(savedKey);
   }
@@ -304,6 +298,7 @@
     let safe = rawTitle;
     const rules = [
       [/\baussie\b/gi, ""],
+      [/\bfebreze\b/gi, ""],
       [/\bfresh\s+burst(\s+scent)?\b/gi, "Fresh Scent"],
       [/\bclean\s+breeze(\s+scent)?\b/gi, "Fresh Scent"],
       [/\bmountain\s+spring(\s+scent)?\b/gi, "Fresh Scent"],
@@ -316,7 +311,7 @@
       [/\bdisinfectant(\s+spray)?\b/gi, "Cleaning Spray"],
       [/\bdisinfecting\b/gi, "Deep Cleaning"],
       [/\bantibacterial\b/gi, "Odor-Fighting"],
-      [/\bkills\s+99\.9%(?:\s+of\s+germs)?\b/gi, "Total Clean"],
+      [/\bkills\s+99\.9%(?:\s+of\s+germs|\s+of\s+odor-causing\s+bacteria\s+and\s+viruses\s+in\s+the\s+air)?\b/gi, "Total Clean"],
       [/\bclorox\b/gi, ""],
       [/\blysol\b/gi, ""],
       [/\barm\s*&\s*hammer\b/gi, ""],
@@ -407,38 +402,38 @@
 
     try {
       const detectPrompt = `
-      Examine this product packaging for affiliate compliance and brand de-identification.
+      Examine this product packaging image with absolute affiliate compliance precision.
 
       TASK 1: COMPLETE VISUAL BOUNDING BOXES (DETERMINISTIC ANCHORS)
-      Scan packaging surface. Return normalized coordinates [ymin, xmin, ymax, xmax] (0 to 1000 integers) covering:
+      Scan entire packaging surface. Return normalized coordinates [ymin, xmin, ymax, xmax] (0 to 1000 integers) covering:
 
-      1. AEROSOL SPRAY CANS, JUGS & BOTTLES:
-        - Aerosol spray cans (e.g. Febreze, Air Wick 3-Packs):
-           * The mask MUST span HORIZONTALLY across ALL cans from the far-left contour of can #1 all the way to the far-right contour of can #3.
-           * VERTICALLY: Must start directly below the plastic spray nozzles and extend DOWNWARD so that it overlaps slightly into the top edge of the '3-PACK' bottom base wrap.
-           * Zero brand letters or red claim text ('Eliminates Odors...') may remain visible on any can.
-         - Handle jugs and liquid bottles (e.g., Lysol, Clorox):
-           * Mask MUST start from top neck/shoulder line to cover arched headers ('KILLS COLD, FLU & VIRUSES'), diagonal brand name ('Lysol'), and 'SANITIZER'.
-           * Enclose the ENTIRE red starburst claim badge on the far left ('KILLS 99.9%') all the way to the outer bottle edge contour.
-           * Keep 'LAUNDRY' visible if possible, but completely mask 'SANITIZER'.
+      1. AEROSOL SPRAY MULTI-PACKS (e.g. Febreze, Air Wick 3-Packs):
+         - CRITICAL REQUIREMENT: For multi-can packs, return a SINGLE WIDE UNIFIED BOX covering ALL cans from far-left to far-right.
+         - xmin: MUST start at the far-left outer curved edge of Can #1 (usually 0 to 50).
+         - xmax: MUST reach all the way to the far-right outer curved edge of the last can (usually 950 to 1000).
+         - ymin: MUST start directly under the teal/plastic spray nozzle hoods.
+         - ymax: MUST extend downward to completely OVERLAP the top border of the bottom multipack wrap (where '3-PACK' starts).
+         - IT MUST COMPLETELY CONCEAL: Brand script on all cans, 'AIR', 'SANITIZER', and the red claim strip ('Eliminates Odors by Killing 99.9%...').
 
-      2. POUCH CO-BRAND BANNERS & CORNER BADGES:
-         - Enclose 'plus OxiClean', 'ODOR BLASTERS', 'ARM & HAMMER' circular emblem, and trademarked scent badges (e.g., 'fresh burst™').
+      2. JUGS & BOTTLES (e.g., Lysol, Clorox):
+         - Return one box spanning from top neck line across the arched text ('KILLS COLD & FLU'), diagonal brand script ('Lysol'), and 'SANITIZER'.
+         - Enclose the ENTIRE red starburst claim badge on the far left ('KILLS 99.9%') all the way to the outer bottle edge contour.
+         - Keep 'LAUNDRY' visible if possible, but completely mask 'SANITIZER'.
 
-      3. PRIMARY BRAND MARKS & MASCOTS:
-         - Primary brand typography, manufacturer emblems, and mascot silhouettes (e.g. kangaroo, arm & hammer arm).
+      3. BOTTLE CLUSTERS & POUCHES (e.g., Aussie Kids, Arm & Hammer):
+         - Enclose kangaroo silhouettes, primary brand names, OxiClean / Odor Blasters clusters, and circular emblems completely.
 
       CRITICAL WHITELIST (WHAT TO KEEP VISIBLE - DO NOT MASK):
       - Volume and count specs ('16 oz', '8 oz', '90 FL OZ', '72 PAKS', '3-PACK 10 Fl.Oz Each').
       - Generic product types: 'LAUNDRY', 'MOIST', 'SHAMPOO', 'CONDITIONER', 'DETANGLER', '5 in 1 POWER PAKS', 'Simple Fresh Scent'.
-      - Bottom graphics, clothes illustration, and packaging base.
+      - Bottom graphics, clothes illustration, and multipack footer wrap.
 
       TASK 2: PACKAGING GEOMETRY & RECOMMENDED MARGIN
-      Select best margin from: [10, 12.5, 15, 17.5, 20].
+      Select best margin percentage from: [15, 18, 20, 25].
 
       TASK 3: COMPLIANT GENERIC TITLE
       Format: [Count/Volume] + [Generic Product Category] + [Key Safe Features] + [Generic Scent if applicable].
-      Example: "72-Count 5-in-1 Laundry Detergent Power Paks - Fresh Scent"
+      Example: "3-Pack 10 Fl. Oz Each Air Refresher Spray - Simple Fresh Scent"
 
       TASK 4: MANUAL BANNER / COVER PLACEMENT INSTRUCTIONS
       Suggest EXACTLY WHERE the user can place a manual banner, ribbon, or solid cover sticker to block brand trademarks.
@@ -452,7 +447,7 @@
       Return JSON:
       {
         "boxes": [[ymin, xmin, ymax, xmax]],
-        "recommended_margin_pct": 15,
+        "recommended_margin_pct": 18,
         "suggested_title": "...",
         "banner_placement_suggestions": [
           "Place a banner on top of [Brand/Element] at [location]...",
@@ -483,7 +478,7 @@
         aiRecommendedMargin = parseFloat(parsed.recommended_margin_pct) / 100;
         document.getElementById("paddingLabel").textContent = `Mask Margin (Auto: ${parsed.recommended_margin_pct}%)`;
       } else {
-        aiRecommendedMargin = 0.15;
+        aiRecommendedMargin = 0.18;
       }
 
       renderAllMasks();
@@ -519,34 +514,26 @@
     }
   });
 
-  // Expands boxes while accommodating wide side badges
+  // Expands boxes cleanly without restrictive artificial clamps
   function expandBox(box, paddingRatio) {
     const [ymin, xmin, ymax, xmax] = box;
     const w = xmax - xmin;
     const h = ymax - ymin;
-    const padX = w * paddingRatio;
-    const padY = h * paddingRatio;
-
-    let newXmin = Math.max(0, Math.round(xmin - padX));
-    let newXmax = Math.min(1000, Math.round(xmax + padX));
-
-    // Raised from 360 to 650 so side badges (e.g. left bottle burst) don't get clipped
-    const maxAllowedWidth = 650;
-    if ((newXmax - newXmin) > maxAllowedWidth && w < 400) {
-      const center = (xmin + xmax) / 2;
-      newXmin = Math.max(0, Math.round(center - maxAllowedWidth / 2));
-      newXmax = Math.min(1000, Math.round(center + maxAllowedWidth / 2));
-    }
+    
+    // Generous padding to swallow typography tails and ascenders
+    const padX = Math.round(w * paddingRatio);
+    const padY = Math.round(h * (paddingRatio * 0.75));
 
     return [
-      Math.max(0, Math.round(ymin - padY)),
-      newXmin,
-      Math.min(1000, Math.round(ymax + padY)),
-      newXmax
+      Math.max(0, ymin - padY),
+      Math.max(0, xmin - padX),
+      Math.min(1000, ymax + padY),
+      Math.min(1000, xmax + padX)
     ];
   }
 
-  function autoUnionHorizontalNeighbors(boxes, hGapTolerance = 35) {
+  // Merges touching or adjacent horizontal boxes into a single cohesive shield
+  function autoUnionHorizontalNeighbors(boxes, hGapTolerance = 120) {
     if (boxes.length <= 1) return boxes;
     let merged = boxes.map(b => [...b]);
     let changed = true;
@@ -560,7 +547,7 @@
 
           const vOverlap = Math.min(y1_max, y2_max) - Math.max(y1_min, y2_min);
           const minH = Math.min(y1_max - y1_min, y2_max - y2_min);
-          const isSameRow = vOverlap > minH * 0.45;
+          const isSameRow = vOverlap > minH * 0.35;
 
           const isAdjacentH = !(x1_max + hGapTolerance < x2_min || x2_max + hGapTolerance < x1_min);
 
@@ -636,9 +623,22 @@
     const paddingRatio = paddingVal === "auto" ? aiRecommendedMargin : parseFloat(paddingVal);
     const enableHashShield = document.getElementById("hashShieldSelect").value === "true";
 
+    // 1. Expand individual boxes
     let processedBoxes = rawAiBoxes.map(b => expandBox(b, paddingRatio));
-    // Allows clustered aerosol cans and bottles across the pack to bridge into one unified wide mask
-    processedBoxes = autoUnionHorizontalNeighbors(processedBoxes, 70);
+    
+    // 2. Merge neighboring horizontal clusters (spray cans, bottle sets)
+    processedBoxes = autoUnionHorizontalNeighbors(processedBoxes, 120);
+
+    // 3. For any wide merged cluster (> 600 width), ensure it firmly touches the edges
+    processedBoxes = processedBoxes.map(b => {
+      let [ymin, xmin, ymax, xmax] = b;
+      if (xmax - xmin > 550) {
+        xmin = Math.max(0, xmin - 25);
+        xmax = Math.min(1000, xmax + 25);
+        ymax = Math.min(1000, ymax + 15);
+      }
+      return [ymin, xmin, ymax, xmax];
+    });
 
     const allBoxes = [...processedBoxes, ...manualBoxes];
 
@@ -673,8 +673,7 @@
     const rw = Math.max(1, Math.round(w));
     const rh = Math.max(1, Math.round(h));
 
-    // Dynamic blur scaled to packaging dimensions
-    const dynamicBlur = Math.max(35, Math.round(Math.min(canvas.width, canvas.height) * 0.04));
+    const dynamicBlur = Math.max(38, Math.round(Math.min(canvas.width, canvas.height) * 0.045));
     const pad = Math.round(dynamicBlur * 1.2);
 
     const srcX = Math.max(0, x - pad);
@@ -696,7 +695,7 @@
     const [r, g, b] = sCtx.getImageData(0, 0, 1, 1).data;
 
     // Aggressive pixel downsampling to destroy letter structures
-    const scale = 0.025;
+    const scale = 0.02;
     const mini = document.createElement("canvas");
     mini.width = Math.max(2, Math.floor(srcW * scale));
     mini.height = Math.max(2, Math.floor(srcH * scale));
@@ -708,7 +707,7 @@
     offCtx.imageSmoothingEnabled = true;
 
     // Apply color tint wash
-    offCtx.fillStyle = `rgba(${r}, ${g}, ${b}, 0.45)`;
+    offCtx.fillStyle = `rgba(${r}, ${g}, ${b}, 0.50)`;
     offCtx.fillRect(0, 0, srcW, srcH);
 
     // Gaussian diffusion pass
@@ -734,7 +733,7 @@
     maskCanvas.height = rh;
     const mCtx = maskCanvas.getContext("2d");
 
-    const feather = Math.max(8, Math.round(Math.min(rw, rh) * 0.12));
+    const feather = Math.max(8, Math.round(Math.min(rw, rh) * 0.10));
     mCtx.fillStyle = "#ffffff";
     mCtx.fillRect(feather, feather, rw - feather * 2, rh - feather * 2);
     mCtx.filter = `blur(${feather}px)`;
