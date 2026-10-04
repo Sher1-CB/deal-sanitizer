@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Deal Sanitizer & Auto-Masker v1.2.12</title>
+  <title>Deal Sanitizer & Auto-Masker v1.2.13</title>
   <style>
     body { 
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
@@ -98,13 +98,13 @@
 </head>
 <body>
 
-<div class="app-version-fixed">v1.2.12</div>
+<div class="app-version-fixed">v1.2.13</div>
 
 <div class="container">
   <div class="card full-width">
     <h2>
       Automated Deal Asset Sanitizer 
-      <span class="version-header-badge">v1.2.12</span>
+      <span class="version-header-badge">v1.2.13</span>
     </h2>
     
     <label>Gemini API Key</label>
@@ -249,15 +249,34 @@
         .map(Number)
         .sort((a, b) => b - a);
 
-      // Target 3rd-to-latest generation (falls back down if fewer exist)
+      // Filter specifically to LITE variants first
+      const liteModels = geminiModels.filter(name => name.toLowerCase().includes("lite"));
+
+      const liteVersionMap = {};
+      liteModels.forEach(name => {
+        const match = name.match(/gemini-(\d+(?:\.\d+)?)/);
+        if (match) {
+          const ver = parseFloat(match[1]);
+          if (!liteVersionMap[ver]) liteVersionMap[ver] = [];
+          liteVersionMap[ver].push(name);
+        }
+      });
+
+      const sortedLiteVersions = Object.keys(liteVersionMap)
+        .map(Number)
+        .sort((a, b) => b - a);
+
       let targetVersion;
-      if (sortedVersions.length >= 3) {
-        targetVersion = sortedVersions[2]; // 3rd latest
-      } else if (sortedVersions.length === 2) {
-        targetVersion = sortedVersions[1]; // 2nd latest
+      if (sortedLiteVersions.length >= 3) {
+        targetVersion = sortedLiteVersions[2]; // 3rd latest Lite generation
+      } else if (sortedLiteVersions.length === 2) {
+        targetVersion = sortedLiteVersions[1];
       } else {
-        targetVersion = sortedVersions[0]; // latest
+        targetVersion = sortedLiteVersions[0];
       }
+
+      const targetFamily = liteVersionMap[targetVersion] || [];
+      let autoSelectedModel = targetFamily[0] || (liteModels.length > 0 ? liteModels[0] : "gemini-2.5-flash-lite");
       const targetFamily = versionMap[targetVersion] || [];
 
       let autoSelectedModel = targetFamily.find(m => m.includes("lite") && m.includes("flash")) 
