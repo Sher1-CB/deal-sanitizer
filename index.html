@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Deal Sanitizer & Auto-Masker v1.2.37</title>
+  <title>Deal Sanitizer & Auto-Masker v1.2.38</title>
   <style>
     body { 
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
@@ -175,14 +175,14 @@
 </head>
 <body>
 
-<div class="app-version-fixed">v1.2.37</div>
+<div class="app-version-fixed">v1.2.38</div>
 
 <div class="container">
   <div class="card">
     <div style="margin-bottom: 1rem;">
       <h2 style="margin: 0; font-size: 1.4rem;">
         Automated Deal Asset Sanitizer 
-        <span class="version-header-badge">v1.2.37</span>
+        <span class="version-header-badge">v1.2.38</span>
       </h2>
     </div>
 
@@ -194,10 +194,10 @@
       <div>
         <label>Gemini Model</label>
         <select id="modelSelect">
-          <option value="gemini-2.5-flash-lite" selected>gemini-2.5-flash-lite (Active)</option>
+          <option value="gemini-3.5-flash-lite" selected>gemini-3.5-flash-lite (Active Recommended)</option>
           <option value="gemini-flash-latest">gemini-flash-latest</option>
-          <option value="gemini-2.0-flash-lite">gemini-2.0-flash-lite</option>
-          <option value="gemini-2.5-flash">gemini-2.5-flash</option>
+          <option value="gemini-3.5-flash">gemini-3.5-flash</option>
+          <option value="gemini-2.5-flash-lite">gemini-2.5-flash-lite</option>
         </select>
       </div>
       <div>
@@ -293,7 +293,7 @@
   const savedKey = localStorage.getItem("deal_gemini_key");
   if (savedKey) keyInput.value = savedKey;
 
-  // Query API and lock strictly onto the newest generation
+  // Auto-detect and set active models, locking onto newest active Flash-Lite
   async function autoDetectLiteModel(key) {
     const select = document.getElementById("modelSelect");
     if (!key) return;
@@ -329,14 +329,14 @@
       });
 
       var sortedVersions = Object.keys(versionMap).map(Number).sort(function(a, b) { return b - a; });
-      var targetVersion = sortedVersions[0]; // Select newest available tier
+      var targetVersion = sortedVersions[0];
       var chosenGroup = versionMap[targetVersion] || candidatePool;
-      var autoSelected = chosenGroup[0] || genModels[0];
+      var autoSelected = chosenGroup[0] || "gemini-3.5-flash-lite";
 
       select.innerHTML = "";
       var optAuto = document.createElement("option");
       optAuto.value = autoSelected;
-      optAuto.textContent = autoSelected + " (Auto-Selected)";
+      optAuto.textContent = autoSelected + " (Active Recommended)";
       optAuto.selected = true;
       select.appendChild(optAuto);
 
@@ -529,7 +529,6 @@
     }
   });
 
-  // Dynamically uses the dropdown margin ratio
   function expandBoxDynamic(box, userRatio) {
     var ymin = box[0], xmin = box[1], ymax = box[2], xmax = box[3];
     var w = xmax - xmin;
@@ -623,7 +622,6 @@
     off.height = srcH;
     var offCtx = off.getContext("2d");
 
-    // Sample local packaging corners to avoid picking up outer white backdrops
     var samplePoints = [
       { sx: x + Math.round(rw * 0.1), sy: y + Math.round(rh * 0.1) },
       { sx: x + Math.round(rw * 0.9), sy: y + Math.round(rh * 0.1) },
@@ -642,13 +640,11 @@
       var pixel = pCtx.getImageData(0, 0, 1, 1).data;
       var pr = pixel[0], pg = pixel[1], pb = pixel[2];
       var lum = 0.299 * pr + 0.587 * pg + 0.114 * pb;
-      // Discard pure white studio backdrops (lum > 248) to prevent color contamination
       if (lum < 248) {
         validColors.push({ r: pr, g: pg, b: pb });
       }
     });
 
-    // Default fallback color
     var r = 180, g = 180, b = 180;
     if (validColors.length > 0) {
       var median = validColors[Math.floor(validColors.length / 2)];
@@ -823,12 +819,14 @@
     alert("Title copied to clipboard!");
   });
 
+  // Resilient multi-tier fallback with retirement & deprecation detection
   async function callGeminiWithFallback(key, body, initialModel) {
     var candidateModels = [
       initialModel,
-      "gemini-2.5-flash-lite",
+      "gemini-3.5-flash-lite",
       "gemini-flash-latest",
-      "gemini-2.0-flash-lite"
+      "gemini-3.5-flash",
+      "gemini-2.5-flash-lite"
     ].filter(function(v, i, a) { return v && a.indexOf(v) === i; });
 
     var lastError = null;
@@ -842,7 +840,11 @@
         });
         var data = await response.json();
         if (!response.ok || data.error) {
-          if (data.error && (data.error.code === 404 || (data.error.message && data.error.message.indexOf("not found") !== -1))) {
+          var errMsg = (data.error && data.error.message) ? data.error.message.toLowerCase() : "";
+          var errCode = (data.error && data.error.code) ? data.error.code : response.status;
+          
+          // Catch not found, retired, or deprecated endpoints and continue to the next model
+          if (errCode === 404 || errCode === 410 || errMsg.indexOf("not found") !== -1 || errMsg.indexOf("no longer available") !== -1 || errMsg.indexOf("deprecated") !== -1) {
             lastError = new Error(data.error.message);
             continue;
           }
@@ -854,7 +856,7 @@
         continue;
       }
     }
-    throw lastError || new Error("All candidate Lite models failed.");
+    throw lastError || new Error("All active Gemini models failed.");
   }
 
   document.getElementById("downloadBtn").addEventListener("click", function() {
