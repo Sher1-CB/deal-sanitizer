@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Deal Sanitizer & Auto-Masker v1.2.32</title>
+  <title>Deal Sanitizer & Auto-Masker v1.2.33</title>
   <style>
     body { 
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
@@ -91,7 +91,6 @@
     button.success { background: #10b981; }
     button.success:hover { background: #059669; }
 
-    /* Top Controls Row */
     .top-controls-grid {
       display: grid;
       grid-template-columns: 1.2fr 1.3fr 1fr 1fr 1fr 1fr;
@@ -105,7 +104,6 @@
       gap: 0.5rem; 
     }
 
-    /* Side-by-Side Dual Canvas Workspace */
     .dual-preview-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -177,19 +175,17 @@
 </head>
 <body>
 
-<div class="app-version-fixed">v1.2.32</div>
+<div class="app-version-fixed">v1.2.33</div>
 
 <div class="container">
-  <!-- TOP CARD: CONTROLS & API -->
   <div class="card">
     <div style="margin-bottom: 1rem;">
       <h2 style="margin: 0; font-size: 1.4rem;">
         Automated Deal Asset Sanitizer 
-        <span class="version-header-badge">v1.2.32</span>
+        <span class="version-header-badge">v1.2.33</span>
       </h2>
     </div>
 
-    <!-- 6-COLUMN CONTROL ROW -->
     <div class="top-controls-grid">
       <div>
         <label>Gemini API Key</label>
@@ -225,36 +221,31 @@
         <label id="paddingLabel">Mask Margin</label>
         <select id="paddingSelect">
           <option value="auto" selected>Auto (Contextual Snug)</option>
-          <option value="0.08">8% (Ultra-Snug)</option>
-          <option value="0.12">12% (Standard Snug)</option>
-          <option value="0.16">16% (Medium)</option>
+          <option value="0.04">4% (Ultra-Snug)</option>
+          <option value="0.08">8% (Standard Snug)</option>
+          <option value="0.12">12% (Medium)</option>
         </select>
       </div>
     </div>
 
-    <!-- ACTION BUTTON ROW -->
     <div class="btn-row">
       <button id="processBtn" style="flex: 2;">Process Image with AI</button>
       <button id="resetMasksBtn" class="secondary" style="flex: 1;">Reset Masks</button>
       <button id="uploadNewBtn" class="danger" style="flex: 1;">Upload New Image</button>
     </div>
 
-    <!-- COMPLIANCE REMINDER BOX -->
     <div id="complianceReminder" class="compliance-reminder-box">
       ⚠️ <b>Operator Compliance Check:</b> The <b>Red Target Outlines</b> on the left show all detected trademarks and restricted claims. If any red target is not completely submerged in the right preview, <b>click and drag directly on the right preview canvas</b> to add a manual patch before downloading.
     </div>
   </div>
 
-  <!-- DUAL WORKSPACE: SIDE-BY-SIDE CANVASES -->
   <div class="dual-preview-grid">
-    <!-- LEFT PANEL: RAW IMAGE + RED AUDIT BOXES -->
     <div class="canvas-panel">
       <h3><span>🎯</span> Detected Target Areas (Audit View)</h3>
       <div class="hint">Shows red outlines around detected trademarks and restricted claim text.</div>
       <canvas id="targetCanvas"></canvas>
     </div>
 
-    <!-- RIGHT PANEL: SANITIZED OUTPUT (INTERACTIVE) -->
     <div class="canvas-panel">
       <h3><span>✨</span> Masked Output Preview (Interactive)</h3>
       <div class="hint">💡 Click and drag directly on this canvas to manually patch any missed secondary text.</div>
@@ -268,7 +259,6 @@
     </div>
   </div>
 
-  <!-- COMPLIANT TITLE -->
   <div class="card">
     <label style="font-size: 0.95rem; color: #38bdf8; font-weight: bold; margin-bottom: 0.5rem;">Suggested Compliant Title (Brand & Trademark Free)</label>
     <div class="title-row">
@@ -300,7 +290,6 @@
   const savedKey = localStorage.getItem("deal_gemini_key");
   if (savedKey) keyInput.value = savedKey;
 
-  // DYNAMIC AUTO-DETECTION: Populates dropdown and targets 3rd-latest Lite generation
   async function autoDetectLiteModel(key) {
     if (!key) return;
     const select = document.getElementById("modelSelect");
@@ -500,7 +489,7 @@
       - Neutral features: '0% BLEACH', 'ELIMINATES ODORS AT THE SOURCE', 'ELIMINATES TOUGH ODORS'.
       - Packaging structure: handles, caps, nozzles, laundry pod visuals, clothing illustrations.
 
-      Return ONLY valid JSON matching this schema:
+      Return ONLY valid JSON:
       {
         "boxes": [[ymin, xmin, ymax, xmax]],
         "suggested_title": "Generic brand-free compliant title"
@@ -545,13 +534,11 @@
     }
   });
 
-  // Proportional snug padding: prevents boxes from merging across empty packaging art
   function expandBoxSnug(box) {
     const [ymin, xmin, ymax, xmax] = box;
     const w = xmax - xmin;
     const h = ymax - ymin;
 
-    // Tight 4% padding prevents adjacent text and background art from being covered
     const padX = Math.max(2, Math.round(w * 0.04));
     const padY = Math.max(2, Math.round(h * 0.04));
 
@@ -560,14 +547,12 @@
     let newYmax = Math.min(1000, ymax + padY);
     let newXmax = Math.min(1000, xmax + padX);
 
-    // Flank snap: only snap to 0 if the badge is already against the canvas border
     if (xmin <= 90) newXmin = 0;
     if (xmax >= 910) newXmax = 1000;
 
     return [newYmin, newXmin, newYmax, newXmax];
   }
 
-  // 1. RENDER LEFT CANVAS: Original image + Red Target Rectangles
   function renderLeftTargetView() {
     if (!loadedImage) return;
     tCtx.clearRect(0, 0, targetCanvas.width, targetCanvas.height);
@@ -592,7 +577,6 @@
     tCtx.restore();
   }
 
-  // 2. RENDER RIGHT CANVAS: Clean Frosted Output (Interactive manual touchups)
   function renderRightMaskedView() {
     if (!loadedImage) return;
     ctx.clearRect(0, 0, outputCanvas.width, outputCanvas.height);
@@ -628,7 +612,7 @@
     const rw = Math.max(1, Math.round(w));
     const rh = Math.max(1, Math.round(h));
 
-    const dynamicBlur = Math.max(20, Math.round(28 * (outputCanvas.width / 1400)));
+    const dynamicBlur = Math.max(18, Math.round(24 * (outputCanvas.width / 1400)));
     const pad = Math.round(dynamicBlur * 1.1);
 
     const srcX = Math.max(0, x - pad);
@@ -641,7 +625,6 @@
     off.height = srcH;
     const offCtx = off.getContext("2d");
 
-    // Sample the immediate packaging surface above the text rather than the dark letter ink
     const sampleCanvas = document.createElement("canvas");
     sampleCanvas.width = 1;
     sampleCanvas.height = 1;
@@ -650,7 +633,6 @@
     sCtx.drawImage(loadedImage, x, sampleY, rw, 2, 0, 0, 1, 1);
     let [r, g, b] = sCtx.getImageData(0, 0, 1, 1).data;
 
-    // Lift contrast for light packaging to prevent muddy or dark gray masking
     const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
     if (luminance < 80) {
       r = Math.min(245, r + 50);
@@ -658,15 +640,6 @@
       b = Math.min(245, b + 50);
     }
 
-    // Apply baseline luminance floor to avoid dark shadow artifacts
-    const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
-    if (luminance < 60) {
-      r = Math.min(235, r + 70);
-      g = Math.min(235, g + 70);
-      b = Math.min(235, b + 70);
-    }
-
-    // Scramble typography vectors
     const scale = 0.02;
     const mini = document.createElement("canvas");
     mini.width = Math.max(2, Math.floor(srcW * scale));
@@ -678,8 +651,7 @@
     offCtx.drawImage(mini, 0, 0, mini.width, mini.height, 0, 0, srcW, srcH);
     offCtx.imageSmoothingEnabled = true;
 
-    // High opacity wash (0.86) to prevent white typography bleed
-    offCtx.fillStyle = `rgba(${r}, ${g}, ${b}, 0.86)`;
+    offCtx.fillStyle = `rgba(${r}, ${g}, ${b}, 0.88)`;
     offCtx.fillRect(0, 0, srcW, srcH);
 
     const blurCanvas = document.createElement("canvas");
@@ -703,11 +675,10 @@
     maskCanvas.height = rh;
     const mCtx = maskCanvas.getContext("2d");
 
-    const feather = Math.max(1, Math.min(6, Math.round(Math.min(rw, rh) * 0.08)));
+    const feather = Math.max(1, Math.min(5, Math.round(Math.min(rw, rh) * 0.08)));
     mCtx.fillStyle = "#ffffff";
     if (isBorderSnapped) {
-      // Keep x = 0 flush to eliminate the left border gap, but feather top/bottom smoothly
-      mCtx.fillRect(0, feather, rw - feather, Math.max(1, rh - feather * 2));
+      mCtx.fillRect(0, 0, rw - feather, rh);
     } else {
       mCtx.fillRect(feather, feather, Math.max(1, rw - feather * 2), Math.max(1, rh - feather * 2));
     }
@@ -783,7 +754,6 @@
     };
   }
 
-  // Interactive dragging directly on the Right Preview Canvas
   outputCanvas.addEventListener("mousedown", (e) => {
     if (!loadedImage) return;
     isDragging = true;
