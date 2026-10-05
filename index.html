@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Deal Sanitizer & Auto-Masker v1.2.43</title>
+  <title>Deal Sanitizer & Auto-Masker v1.2.44</title>
   <style>
     body { 
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
@@ -175,14 +175,14 @@
 </head>
 <body>
 
-<div class="app-version-fixed">v1.2.43</div>
+<div class="app-version-fixed">v1.2.44</div>
 
 <div class="container">
   <div class="card">
     <div style="margin-bottom: 1rem;">
       <h2 style="margin: 0; font-size: 1.4rem;">
         Automated Deal Asset Sanitizer 
-        <span class="version-header-badge">v1.2.43</span>
+        <span class="version-header-badge">v1.2.44</span>
       </h2>
     </div>
 
@@ -473,24 +473,29 @@
 
     try {
       const detectPrompt = `
-      You are an automated Intellectual Property & Regulatory Compliance Auditor.
-      Return normalized bounding boxes [ymin, xmin, ymax, xmax] (0-1000 integers) for EVERY sensitive mark on this packaging:
+      You are a universal Intellectual Property and Regulatory Compliance Auditor.
+      Inspect this retail packaging image across all categories (bottles, pouches, boxes, cans).
+      
+      EVALUATION PROTOCOL:
+      Identify every text string and graphic symbol. Classify them into MASK vs PRESERVE:
 
-      MANDATORY DETECTION TARGETS:
-      1. UPPER ARCH ANCHOR: For curved claim text ('KILLS COLD, FLU & COVID-19 VIRUSES'), the bounding box MUST anchor its top edge (ymin) directly against the blue plastic neck collar so no red letters escape at the top.
-      2. CENTRAL LOGO: Generously box the primary brand emblem ('Lysol', 'Clorox', 'Arm & Hammer') to eliminate white letterform ghosting.
-      3. SURGICAL SANITIZER LINE: Box ONLY the isolated word 'SANITIZER'. Do NOT include 'LAUNDRY' above it, and do NOT include 'CRISP LINEN SCENT' below it.
-      4. Health badges and starbursts: 'KILLS 99.9%', 'BACTERIA', 'VIRUSES', 'ODOR BLASTERS'.
+      MUST MASK (Return tight bounding boxes [ymin, xmin, ymax, xmax] as 0-1000 integers):
+      1. INTELLECTUAL PROPERTY: All brand names, manufacturer logos, parent company signatures, mascot illustrations, and any text carrying ™ or ®.
+      2. REGULATED & MEDICAL CLAIMS: Any word or phrase making germicidal, virucidal, or health claims (specifically terms containing root stems: 'sanitiz', 'disinfect', 'kill', '99.9%', 'virus', 'bacteri', 'germ', 'proven').
+      3. PROMOTIONAL CLAIM SEALS: Standalone badges or starburst graphics asserting antimicrobial efficacy.
 
-      STRICT PRESERVE LIST (NEVER BOX):
-      - 'LAUNDRY' (must stay crisp and unmasked).
-      - 'CRISP LINEN SCENT' (must stay crisp and unmasked).
-      - '90 FL OZ', '0% BLEACH', and clothing graphics.
+      MUST PRESERVE (DO NOT MASK):
+      1. GENERIC PRODUCT NOUNS: The common product category (e.g., 'Laundry', 'Detergent', 'Shampoo', 'Conditioner', 'Hot Cocoa Pods', 'Cleaner', 'Refresher').
+      2. PHYSICAL MEASUREMENTS: Counts, fluid ounces, weights, and pack sizes (e.g., '90 FL OZ', '72 PAKS', '24 PODS', '16 oz').
+      3. NEUTRAL DESCRIPTORS: Unbranded scent or flavor names (e.g., 'Crisp Linen', 'Salted Caramel'), standard features ('0% Bleach'), and product photography.
+
+      BOUNDING BOX RULES:
+      - Box ONLY the exact violating text lines or emblems. Never box blank plastic, handles, caps, or adjacent preserved words.
 
       Return ONLY valid JSON matching this schema:
       {
         "boxes": [[ymin, xmin, ymax, xmax]],
-        "suggested_title": "Generic brand-free compliant title"
+        "suggested_title": "[Count/Volume] + [Generic Product Category] + [Key Safe Feature] + [Generic Scent/Flavor]"
       }
       `;
 
