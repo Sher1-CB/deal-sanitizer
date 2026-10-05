@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Deal Sanitizer & Auto-Masker v1.2.30</title>
+  <title>Deal Sanitizer & Auto-Masker v1.2.31</title>
   <style>
     body { 
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
@@ -177,7 +177,7 @@
 </head>
 <body>
 
-<div class="app-version-fixed">v1.2.30</div>
+<div class="app-version-fixed">v1.2.31</div>
 
 <div class="container">
   <!-- TOP CARD: CONTROLS & API -->
@@ -185,7 +185,7 @@
     <div style="margin-bottom: 1rem;">
       <h2 style="margin: 0; font-size: 1.4rem;">
         Automated Deal Asset Sanitizer 
-        <span class="version-header-badge">v1.2.30</span>
+        <span class="version-header-badge">v1.2.31</span>
       </h2>
     </div>
 
@@ -473,30 +473,37 @@
 
     try {
       const detectPrompt = `
-      You are an automated Intellectual Property & Regulatory Compliance Auditor.
-      Your objective is to identify and return precise bounding boxes [ymin, xmin, ymax, xmax] (integers 0-1000) for all elements that trigger automated IP, trademark, or ad policy flags on social media.
+      You are an automated Intellectual Property & Regulatory Compliance Auditor conducting an exhaustive visual sweep.
+      Return normalized bounding boxes [ymin, xmin, ymax, xmax] (0-1000 integers) for EVERY sensitive text and graphic mark on this packaging.
 
-      UNIVERSAL TARGET RULES:
-      1. TRADEMARKS & BRANDING:
-         - Any brand wordmark, corporate logo, cursive signature, emblem, or character mascot.
-         - Secondary brand names, co-branding marks, and any text bearing a registered symbol (™ or ®).
-      2. REGULATORY & RESTRICTED CLAIMS:
-         - Health, medical, viral, and bacterial claims (e.g., kill rates like '99.9%', viral names, 'disinfectant', 'sanitizer', 'antibacterial').
-         - Unsubstantiated efficacy banners and testing claim lines.
-      3. ITEMIZATION REQUIREMENT:
-         - Each discrete visual element or text block MUST receive its own independent, tightly-fitted bounding box.
-         - NEVER merge distinct, separated text blocks into a single large bounding box.
+      MANDATORY DETECTION TARGETS (ZERO-TOLERANCE):
 
-      UNIVERSAL WHITELIST (DO NOT COVER):
-      - Standard product category terms (e.g., 'Laundry Detergent', 'Shampoo', 'Conditioner', 'Air Refresher', 'Body Wash', 'Fabric Softener').
-      - Quantities, weights, and counts (e.g., fluid ounces, pack counts, liters, piece counts).
-      - Scent descriptions and ingredient callouts (e.g., 'Crisp Linen', 'Lavender', 'Aloe').
-      - General product photography, packaging handles, lids, and structural container silhouettes.
+      1. REGULATORY & MEDICAL CLAIMS (CRITICAL):
+         - ANY occurrence of the word 'SANITIZER' or 'DISINFECTANT', regardless of where it appears.
+         - Scientific testing claims: 'SCIENTIFICALLY PROVEN', 'CLINICALLY TESTED', 'LAB TESTED'.
+         - Germ, virus, and bacteria claims: 'KILLS 99.9%', 'COVID-19', 'COLD & FLU', 'VIRUSES', 'BACTERIA'.
+         - Red or brightly colored claim badges, starbursts, and efficacy seals.
 
-      Return ONLY valid JSON matching this schema:
+      2. TRADEMARKS & BRAND IDENTIFIERS:
+         - Primary brand logos, cursive signatures, emblems, and corporate crests.
+         - Registered sub-brands, co-brands, and secondary marks bearing ™ or ® (e.g. 'OxiClean', 'Odor Blasters', registered scent names).
+
+      3. ITEMIZATION MANDATE:
+         - Scan the packaging from TOP to BOTTOM.
+         - Do not stop after finding the main logo. Return dedicated, tight boxes for EACH separate claim line, badge, and descriptor identified above.
+         - If a product appears as a multi-pack, identify these targets on EVERY individual container shown.
+
+      STRICT WHITELIST (NEVER MASK):
+      - Generic household terms: 'LAUNDRY', 'AIR', 'DETERGENT', 'FABRIC', 'CLEANER'.
+      - Volumes, weights, and counts: '90 FL OZ', '72 PAKS', '3-PACK', '10 Fl.Oz Each', '16 oz'.
+      - Neutral scent names: 'Crisp Linen Scent', 'Fresh Scent', 'Lavender'.
+      - Neutral features: '0% BLEACH', 'ELIMINATES ODORS AT THE SOURCE', '5 in 1 POWER PAKS'.
+      - Product imagery: clothes illustrations, laundry pods, trigger nozzles, handles.
+
+      Return ONLY valid JSON:
       {
         "boxes": [[ymin, xmin, ymax, xmax]],
-        "suggested_title": "Clean, generic, trademark-free product title"
+        "suggested_title": "Clean generic compliant product title"
       }
       `;
 
