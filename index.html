@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Deal Sanitizer & Auto-Masker v1.2.44</title>
+  <title>Deal Sanitizer & Auto-Masker v1.2.45</title>
   <style>
     body { 
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
@@ -175,14 +175,14 @@
 </head>
 <body>
 
-<div class="app-version-fixed">v1.2.44</div>
+<div class="app-version-fixed">v1.2.45</div>
 
 <div class="container">
   <div class="card">
     <div style="margin-bottom: 1rem;">
       <h2 style="margin: 0; font-size: 1.4rem;">
         Automated Deal Asset Sanitizer 
-        <span class="version-header-badge">v1.2.44</span>
+        <span class="version-header-badge">v1.2.45</span>
       </h2>
     </div>
 
@@ -477,20 +477,18 @@
       Inspect this retail packaging image across all categories (bottles, pouches, boxes, cans).
       
       EVALUATION PROTOCOL:
-      Identify every text string and graphic symbol. Classify them into MASK vs PRESERVE:
+      Identify every printed text string and logo graphic. Classify them into MASK vs PRESERVE:
 
       MUST MASK (Return tight bounding boxes [ymin, xmin, ymax, xmax] as 0-1000 integers):
-      1. INTELLECTUAL PROPERTY: All brand names, manufacturer logos, parent company signatures, mascot illustrations, and any text carrying ™ or ®.
-      2. REGULATED & MEDICAL CLAIMS: Any word or phrase making germicidal, virucidal, or health claims (specifically terms containing root stems: 'sanitiz', 'disinfect', 'kill', '99.9%', 'virus', 'bacteri', 'germ', 'proven').
-      3. PROMOTIONAL CLAIM SEALS: Standalone badges or starburst graphics asserting antimicrobial efficacy.
+      1. INTELLECTUAL PROPERTY: All brand names, manufacturer logos, emblems, and text carrying ™ or ®.
+      2. REGULATED & MEDICAL CLAIMS:
+         - Arched/curved claim text printed above or below logos (e.g., 'KILLS COLD, FLU & COVID-19 VIRUSES'). Box the actual printed text curve.
+         - The word 'SANITIZER' or 'DISINFECTANT' (box only the word, do not touch 'LAUNDRY').
+         - Efficacy claim badges and starbursts ('KILLS 99.9%', 'BACTERIA').
 
-      MUST PRESERVE (DO NOT MASK):
-      1. GENERIC PRODUCT NOUNS: The common product category (e.g., 'Laundry', 'Detergent', 'Shampoo', 'Conditioner', 'Hot Cocoa Pods', 'Cleaner', 'Refresher').
-      2. PHYSICAL MEASUREMENTS: Counts, fluid ounces, weights, and pack sizes (e.g., '90 FL OZ', '72 PAKS', '24 PODS', '16 oz').
-      3. NEUTRAL DESCRIPTORS: Unbranded scent or flavor names (e.g., 'Crisp Linen', 'Salted Caramel'), standard features ('0% Bleach'), and product photography.
-
-      BOUNDING BOX RULES:
-      - Box ONLY the exact violating text lines or emblems. Never box blank plastic, handles, caps, or adjacent preserved words.
+      STRICT HARDWARE & PRESERVE EXCLUSIONS (NEVER BOX):
+      - DO NOT BOX HARDWARE: The blue bottle cap, closures, neck plastic, handles, and blank container surfaces are physical parts, NOT text. Every box MUST contain printed ink.
+      - PRESERVE: Keep 'LAUNDRY', 'CRISP LINEN SCENT', and '90 FL OZ' completely unboxed.
 
       Return ONLY valid JSON matching this schema:
       {
