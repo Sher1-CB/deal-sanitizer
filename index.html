@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Deal Sanitizer & Auto-Masker v1.2.38</title>
+  <title>Deal Sanitizer & Auto-Masker v1.2.39</title>
   <style>
     body { 
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
@@ -175,14 +175,14 @@
 </head>
 <body>
 
-<div class="app-version-fixed">v1.2.38</div>
+<div class="app-version-fixed">v1.2.39</div>
 
 <div class="container">
   <div class="card">
     <div style="margin-bottom: 1rem;">
       <h2 style="margin: 0; font-size: 1.4rem;">
         Automated Deal Asset Sanitizer 
-        <span class="version-header-badge">v1.2.38</span>
+        <span class="version-header-badge">v1.2.39</span>
       </h2>
     </div>
 
@@ -194,10 +194,10 @@
       <div>
         <label>Gemini Model</label>
         <select id="modelSelect">
-          <option value="gemini-3.5-flash-lite" selected>gemini-3.5-flash-lite (Active Recommended)</option>
-          <option value="gemini-flash-latest">gemini-flash-latest</option>
-          <option value="gemini-3.5-flash">gemini-3.5-flash</option>
+          <option value="gemini-3.1-flash-lite" selected>gemini-3.1-flash-lite (2nd-to-Latest Lite)</option>
+          <option value="gemini-3.5-flash-lite">gemini-3.5-flash-lite</option>
           <option value="gemini-2.5-flash-lite">gemini-2.5-flash-lite</option>
+          <option value="gemini-flash-lite-latest">gemini-flash-lite-latest</option>
         </select>
       </div>
       <div>
@@ -293,7 +293,7 @@
   const savedKey = localStorage.getItem("deal_gemini_key");
   if (savedKey) keyInput.value = savedKey;
 
-  // Auto-detect and set active models, locking onto newest active Flash-Lite
+  // Auto-detect and set strictly the 2nd-to-latest release in LITE tier
   async function autoDetectLiteModel(key) {
     const select = document.getElementById("modelSelect");
     if (!key) return;
@@ -303,45 +303,54 @@
       const data = await res.json();
       if (!data.models || !Array.isArray(data.models)) return;
 
-      const genModels = data.models
+      // Filter strictly to generation-capable, general multimodal LITE models
+      const pureLiteModels = data.models
+        .filter(function(m) {
+          const methods = m.supportedGenerationMethods || [];
+          return methods.includes("generateContent");
+        })
         .map(function(m) { return m.name.replace("models/", ""); })
         .filter(function(n) {
-          var l = n.toLowerCase();
-          return l.indexOf("gemini") !== -1 && l.indexOf("preview") === -1 && l.indexOf("embedding") === -1 && l.indexOf("aqa") === -1;
+          const l = n.toLowerCase();
+          return l.includes("gemini") &&
+                 l.includes("lite") &&
+                 !l.includes("tts") &&
+                 !l.includes("transcribe") &&
+                 !l.includes("embedding") &&
+                 !l.includes("aqa") &&
+                 !l.includes("preview");
         });
 
-      if (genModels.length === 0) return;
+      if (pureLiteModels.length === 0) return;
 
-      var litePool = genModels.filter(function(n) {
-        var l = n.toLowerCase();
-        return l.indexOf("lite") !== -1 || l.indexOf("flash") !== -1;
-      });
-      var candidatePool = litePool.length > 0 ? litePool : genModels;
-
-      var versionMap = {};
-      candidatePool.forEach(function(n) {
-        var m = n.match(/gemini-(\d+(?:\.\d+)?)/i);
+      // Group by numeric version
+      const versionMap = {};
+      pureLiteModels.forEach(function(n) {
+        const m = n.match(/gemini-(\d+(?:\.\d+)?)/i);
         if (m) {
-          var v = parseFloat(m[1]);
+          const v = parseFloat(m[1]);
           if (!versionMap[v]) versionMap[v] = [];
           versionMap[v].push(n);
         }
       });
 
-      var sortedVersions = Object.keys(versionMap).map(Number).sort(function(a, b) { return b - a; });
-      var targetVersion = sortedVersions[0];
-      var chosenGroup = versionMap[targetVersion] || candidatePool;
-      var autoSelected = chosenGroup[0] || "gemini-3.5-flash-lite";
+      // Sort descending (newest version first)
+      const sortedVersions = Object.keys(versionMap).map(Number).sort(function(a, b) { return b - a; });
+
+      // Target strictly the 2nd-to-the-latest release (index 1)
+      const targetVersion = sortedVersions.length >= 2 ? sortedVersions[1] : sortedVersions[0];
+      const chosenGroup = versionMap[targetVersion] || pureLiteModels;
+      const autoSelected = chosenGroup[0] || pureLiteModels[0];
 
       select.innerHTML = "";
-      var optAuto = document.createElement("option");
+      const optAuto = document.createElement("option");
       optAuto.value = autoSelected;
-      optAuto.textContent = autoSelected + " (Active Recommended)";
+      optAuto.textContent = autoSelected + " (2nd-to-Latest Lite)";
       optAuto.selected = true;
       select.appendChild(optAuto);
 
-      genModels.filter(function(m) { return m !== autoSelected; }).forEach(function(m) {
-        var opt = document.createElement("option");
+      pureLiteModels.filter(function(m) { return m !== autoSelected; }).forEach(function(m) {
+        const opt = document.createElement("option");
         opt.value = m;
         opt.textContent = m;
         select.appendChild(opt);
@@ -353,7 +362,7 @@
   }
 
   keyInput.addEventListener("change", function() {
-    var val = keyInput.value.trim();
+    const val = keyInput.value.trim();
     localStorage.setItem("deal_gemini_key", val);
     if (val) autoDetectLiteModel(val);
   });
@@ -361,8 +370,8 @@
 
   function enforceSafeTitle(rawTitle) {
     if (!rawTitle) return "";
-    var safe = rawTitle;
-    var rules = [
+    let safe = rawTitle;
+    const rules = [
       [/\baussie\b/gi, ""],
       [/\bfebreze\b/gi, ""],
       [/\bfresh\s+burst(\s+scent)?\b/gi, "Fresh Scent"],
@@ -391,11 +400,11 @@
   }
 
   document.getElementById("imageInput").addEventListener("change", function(e) {
-    var file = e.target.files[0];
+    const file = e.target.files[0];
     if (!file) return;
 
     imageMimeType = file.type || "image/jpeg";
-    var reader = new FileReader();
+    const reader = new FileReader();
     reader.onload = function(evt) {
       base64Image = evt.target.result.split(",")[1];
       loadedImage = new Image();
@@ -434,7 +443,7 @@
     document.getElementById("downloadBtn").style.display = "none";
     document.getElementById("complianceReminder").style.display = "none";
     
-    var fileInput = document.getElementById("imageInput");
+    const fileInput = document.getElementById("imageInput");
     fileInput.value = "";
     fileInput.click();
   });
@@ -456,18 +465,18 @@
   });
 
   document.getElementById("processBtn").addEventListener("click", async function() {
-    var key = keyInput.value.trim();
-    var selectedModel = document.getElementById("modelSelect").value;
+    const key = keyInput.value.trim();
+    const selectedModel = document.getElementById("modelSelect").value;
 
     if (!key) return alert("Please enter your Gemini API Key.");
     if (!base64Image) return alert("Please select an image first.");
 
-    var btn = document.getElementById("processBtn");
+    const btn = document.getElementById("processBtn");
     btn.disabled = true;
     btn.innerText = "Auditing packaging boundaries...";
 
     try {
-      var detectPrompt = "You are an automated Intellectual Property & Regulatory Compliance Auditor conducting an exhaustive visual sweep.\n" +
+      const detectPrompt = "You are an automated Intellectual Property & Regulatory Compliance Auditor conducting an exhaustive visual sweep.\n" +
       "Return normalized bounding boxes [ymin, xmin, ymax, xmax] (0-1000 integers) for EVERY sensitive text and graphic mark on this packaging.\n\n" +
       "MANDATORY DETECTION TARGETS (ZERO-TOLERANCE):\n\n" +
       "1. RESTRICTED MEDICAL, VIRAL & REGULATORY TERMS:\n" +
@@ -491,7 +500,7 @@
       "Return ONLY valid JSON matching this schema:\n" +
       "{\n  \"boxes\": [[ymin, xmin, ymax, xmax]],\n  \"suggested_title\": \"Generic brand-free compliant title\"\n}";
 
-      var detectData = await callGeminiWithFallback(key, {
+      const detectData = await callGeminiWithFallback(key, {
         contents: [{
           parts: [
             { text: detectPrompt },
@@ -504,11 +513,11 @@
         }
       }, selectedModel);
 
-      var rawText = detectData.candidates[0]?.content?.parts[0]?.text || "{}";
+      let rawText = detectData.candidates[0]?.content?.parts[0]?.text || "{}";
       rawText = rawText.replace(/```json/g, "").replace(/```/g, "").trim();
       if (rawText.lastIndexOf("}") < rawText.lastIndexOf("{")) rawText += "}";
 
-      var parsed = JSON.parse(rawText);
+      const parsed = JSON.parse(rawText);
       rawAiBoxes = Array.isArray(parsed) ? parsed : (parsed.boxes || []);
 
       document.getElementById("complianceReminder").style.display = "block";
@@ -530,18 +539,18 @@
   });
 
   function expandBoxDynamic(box, userRatio) {
-    var ymin = box[0], xmin = box[1], ymax = box[2], xmax = box[3];
-    var w = xmax - xmin;
-    var h = ymax - ymin;
+    const ymin = box[0], xmin = box[1], ymax = box[2], xmax = box[3];
+    const w = xmax - xmin;
+    const h = ymax - ymin;
 
-    var ratio = userRatio === "auto" ? 0.04 : parseFloat(userRatio);
-    var padX = Math.max(3, Math.round(w * ratio));
-    var padY = Math.max(2, Math.round(h * (ratio * 0.75)));
+    const ratio = userRatio === "auto" ? 0.04 : parseFloat(userRatio);
+    const padX = Math.max(3, Math.round(w * ratio));
+    const padY = Math.max(2, Math.round(h * (ratio * 0.75)));
 
-    var newYmin = Math.max(0, ymin - padY);
-    var newXmin = Math.max(0, xmin - padX);
-    var newYmax = Math.min(1000, ymax + padY);
-    var newXmax = Math.min(1000, xmax + padX);
+    let newYmin = Math.max(0, ymin - padY);
+    let newXmin = Math.max(0, xmin - padX);
+    let newYmax = Math.min(1000, ymax + padY);
+    let newXmax = Math.min(1000, xmax + padX);
 
     if (xmin <= 30) newXmin = 0;
     if (xmax >= 970) newXmax = 1000;
@@ -562,11 +571,11 @@
     tCtx.setLineDash([6, 5]);
 
     rawAiBoxes.forEach(function(box) {
-      var ymin = box[0], xmin = box[1], ymax = box[2], xmax = box[3];
-      var x = (xmin / 1000) * targetCanvas.width;
-      var y = (ymin / 1000) * targetCanvas.height;
-      var w = ((xmax - xmin) / 1000) * targetCanvas.width;
-      var h = ((ymax - ymin) / 1000) * targetCanvas.height;
+      const ymin = box[0], xmin = box[1], ymax = box[2], xmax = box[3];
+      const x = (xmin / 1000) * targetCanvas.width;
+      const y = (ymin / 1000) * targetCanvas.height;
+      const w = ((xmax - xmin) / 1000) * targetCanvas.width;
+      const h = ((ymax - ymin) / 1000) * targetCanvas.height;
 
       tCtx.strokeRect(x, y, w, h);
     });
@@ -578,17 +587,17 @@
     ctx.clearRect(0, 0, outputCanvas.width, outputCanvas.height);
     ctx.drawImage(loadedImage, 0, 0);
 
-    var mode = document.getElementById("maskMode").value;
-    var userMargin = document.getElementById("paddingSelect").value;
-    var processedBoxes = rawAiBoxes.map(function(b) { return expandBoxDynamic(b, userMargin); });
-    var allBoxes = processedBoxes.concat(manualBoxes);
+    const mode = document.getElementById("maskMode").value;
+    const userMargin = document.getElementById("paddingSelect").value;
+    const processedBoxes = rawAiBoxes.map(function(b) { return expandBoxDynamic(b, userMargin); });
+    const allBoxes = processedBoxes.concat(manualBoxes);
 
     allBoxes.forEach(function(box) {
-      var ymin = box[0], xmin = box[1], ymax = box[2], xmax = box[3];
-      var x = (xmin / 1000) * outputCanvas.width;
-      var y = (ymin / 1000) * outputCanvas.height;
-      var w = ((xmax - xmin) / 1000) * outputCanvas.width;
-      var h = ((ymax - ymin) / 1000) * outputCanvas.height;
+      const ymin = box[0], xmin = box[1], ymax = box[2], xmax = box[3];
+      const x = (xmin / 1000) * outputCanvas.width;
+      const y = (ymin / 1000) * outputCanvas.height;
+      const w = ((xmax - xmin) / 1000) * outputCanvas.width;
+      const h = ((ymax - ymin) / 1000) * outputCanvas.height;
 
       if (mode === "ambient") {
         applyAmbientBlock(x, y, w, h);
@@ -606,90 +615,91 @@
 
   function applyFrostedDiffusion(x, y, w, h, isBorderSnapped) {
     if (w <= 0 || h <= 0) return;
-    var rw = Math.max(1, Math.round(w));
-    var rh = Math.max(1, Math.round(h));
+    const rw = Math.max(1, Math.round(w));
+    const rh = Math.max(1, Math.round(h));
 
-    var dynamicBlur = Math.max(18, Math.round(24 * (outputCanvas.width / 1400)));
-    var pad = Math.round(dynamicBlur * 1.1);
+    const dynamicBlur = Math.max(18, Math.round(24 * (outputCanvas.width / 1400)));
+    const pad = Math.round(dynamicBlur * 1.1);
 
-    var srcX = Math.max(0, x - pad);
-    var srcY = Math.max(0, y - pad);
-    var srcW = Math.min(loadedImage.naturalWidth - srcX, rw + pad * 2);
-    var srcH = Math.min(loadedImage.naturalHeight - srcY, rh + pad * 2);
+    const srcX = Math.max(0, x - pad);
+    const srcY = Math.max(0, y - pad);
+    const srcW = Math.min(loadedImage.naturalWidth - srcX, rw + pad * 2);
+    const srcH = Math.min(loadedImage.naturalHeight - srcY, rh + pad * 2);
 
-    var off = document.createElement("canvas");
+    const off = document.createElement("canvas");
     off.width = srcW;
     off.height = srcH;
-    var offCtx = off.getContext("2d");
+    const offCtx = off.getContext("2d");
 
-    var samplePoints = [
+    // Sample local packaging points
+    const samplePoints = [
       { sx: x + Math.round(rw * 0.1), sy: y + Math.round(rh * 0.1) },
       { sx: x + Math.round(rw * 0.9), sy: y + Math.round(rh * 0.1) },
       { sx: x + Math.round(rw * 0.5), sy: Math.max(0, y - 3) },
       { sx: x + Math.round(rw * 0.5), sy: Math.min(loadedImage.naturalHeight - 1, y + rh + 3) }
     ];
 
-    var validColors = [];
-    var pCanvas = document.createElement("canvas");
+    const validColors = [];
+    const pCanvas = document.createElement("canvas");
     pCanvas.width = 1; 
     pCanvas.height = 1;
-    var pCtx = pCanvas.getContext("2d");
+    const pCtx = pCanvas.getContext("2d");
 
     samplePoints.forEach(function(pt) {
       pCtx.drawImage(loadedImage, pt.sx, pt.sy, 1, 1, 0, 0, 1, 1);
-      var pixel = pCtx.getImageData(0, 0, 1, 1).data;
-      var pr = pixel[0], pg = pixel[1], pb = pixel[2];
-      var lum = 0.299 * pr + 0.587 * pg + 0.114 * pb;
+      const pixel = pCtx.getImageData(0, 0, 1, 1).data;
+      const pr = pixel[0], pg = pixel[1], pb = pixel[2];
+      const lum = 0.299 * pr + 0.587 * pg + 0.114 * pb;
       if (lum < 248) {
         validColors.push({ r: pr, g: pg, b: pb });
       }
     });
 
-    var r = 180, g = 180, b = 180;
+    let r = 180, g = 180, b = 180;
     if (validColors.length > 0) {
-      var median = validColors[Math.floor(validColors.length / 2)];
+      const median = validColors[Math.floor(validColors.length / 2)];
       r = median.r; g = median.g; b = median.b;
     }
 
-    var scale = 0.02;
-    var mini = document.createElement("canvas");
+    const scale = 0.02;
+    const mini = document.createElement("canvas");
     mini.width = Math.max(2, Math.floor(srcW * scale));
     mini.height = Math.max(2, Math.floor(srcH * scale));
-    var miniCtx = mini.getContext("2d");
+    const miniCtx = mini.getContext("2d");
     miniCtx.drawImage(loadedImage, srcX, srcY, srcW, srcH, 0, 0, mini.width, mini.height);
 
     offCtx.imageSmoothingEnabled = false;
     offCtx.drawImage(mini, 0, 0, mini.width, mini.height, 0, 0, srcW, srcH);
     offCtx.imageSmoothingEnabled = true;
 
-    var isCompact = Math.min(rw, rh) < 40;
+    const isCompact = Math.min(rw, rh) < 40;
     offCtx.fillStyle = isCompact 
       ? "rgba(" + r + ", " + g + ", " + b + ", 1.0)" 
       : "rgba(" + r + ", " + g + ", " + b + ", 0.92)";
     offCtx.fillRect(0, 0, srcW, srcH);
 
-    var blurCanvas = document.createElement("canvas");
+    const blurCanvas = document.createElement("canvas");
     blurCanvas.width = srcW;
     blurCanvas.height = srcH;
-    var bCtx = blurCanvas.getContext("2d");
+    const bCtx = blurCanvas.getContext("2d");
     bCtx.filter = "blur(" + dynamicBlur + "px)";
     bCtx.drawImage(off, 0, 0);
 
-    var offsetX = x - srcX;
-    var offsetY = y - srcY;
+    const offsetX = x - srcX;
+    const offsetY = y - srcY;
 
-    var patchCanvas = document.createElement("canvas");
+    const patchCanvas = document.createElement("canvas");
     patchCanvas.width = rw;
     patchCanvas.height = rh;
-    var pCtx2 = patchCanvas.getContext("2d");
+    const pCtx2 = patchCanvas.getContext("2d");
     pCtx2.drawImage(blurCanvas, offsetX, offsetY, rw, rh, 0, 0, rw, rh);
 
-    var maskCanvas = document.createElement("canvas");
+    const maskCanvas = document.createElement("canvas");
     maskCanvas.width = rw;
     maskCanvas.height = rh;
-    var mCtx = maskCanvas.getContext("2d");
+    const mCtx = maskCanvas.getContext("2d");
 
-    var feather = isCompact ? 0 : Math.max(1, Math.min(5, Math.round(Math.min(rw, rh) * 0.06)));
+    const feather = isCompact ? 0 : Math.max(1, Math.min(5, Math.round(Math.min(rw, rh) * 0.06)));
 
     mCtx.fillStyle = "#ffffff";
     if (feather === 0) {
@@ -713,27 +723,27 @@
   }
 
   function applyAmbientBlock(x, y, w, h) {
-    var rw = Math.max(1, Math.round(w));
-    var rh = Math.max(1, Math.round(h));
-    var sampleCanvas = document.createElement("canvas");
+    const rw = Math.max(1, Math.round(w));
+    const rh = Math.max(1, Math.round(h));
+    const sampleCanvas = document.createElement("canvas");
     sampleCanvas.width = 4;
     sampleCanvas.height = 4;
-    var sCtx = sampleCanvas.getContext("2d");
+    const sCtx = sampleCanvas.getContext("2d");
     sCtx.drawImage(loadedImage, x, y, rw, rh, 0, 0, 4, 4);
 
-    var pad = Math.round(20 * (outputCanvas.width / 1400));
-    var off = document.createElement("canvas");
+    const pad = Math.round(20 * (outputCanvas.width / 1400));
+    const off = document.createElement("canvas");
     off.width = rw + pad * 2;
     off.height = rh + pad * 2;
-    var offCtx = off.getContext("2d");
+    const offCtx = off.getContext("2d");
 
     offCtx.imageSmoothingEnabled = true;
     offCtx.drawImage(sampleCanvas, 0, 0, 4, 4, 0, 0, off.width, off.height);
 
-    var blurCanvas = document.createElement("canvas");
+    const blurCanvas = document.createElement("canvas");
     blurCanvas.width = off.width;
     blurCanvas.height = off.height;
-    var bCtx = blurCanvas.getContext("2d");
+    const bCtx = blurCanvas.getContext("2d");
     bCtx.filter = "blur(" + Math.round(20 * (outputCanvas.width / 1400)) + "px)";
     bCtx.drawImage(off, 0, 0);
 
@@ -743,10 +753,10 @@
   }
 
   function applyPixelation(x, y, w, h) {
-    var off = document.createElement("canvas");
+    const off = document.createElement("canvas");
     off.width = Math.max(1, Math.floor(w * 0.035));
     off.height = Math.max(1, Math.floor(h * 0.035));
-    var offCtx = off.getContext("2d");
+    const offCtx = off.getContext("2d");
     offCtx.drawImage(outputCanvas, x, y, w, h, 0, 0, off.width, off.height);
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(off, 0, 0, off.width, off.height, x, y, w, h);
@@ -761,9 +771,9 @@
   }
 
   function getCanvasCoords(evt) {
-    var rect = outputCanvas.getBoundingClientRect();
-    var scaleX = outputCanvas.width / rect.width;
-    var scaleY = outputCanvas.height / rect.height;
+    const rect = outputCanvas.getBoundingClientRect();
+    const scaleX = outputCanvas.width / rect.width;
+    const scaleY = outputCanvas.height / rect.height;
     return {
       x: (evt.clientX - rect.left) * scaleX,
       y: (evt.clientY - rect.top) * scaleY
@@ -773,14 +783,14 @@
   outputCanvas.addEventListener("mousedown", function(e) {
     if (!loadedImage) return;
     isDragging = true;
-    var pt = getCanvasCoords(e);
+    const pt = getCanvasCoords(e);
     dragStartX = pt.x;
     dragStartY = pt.y;
   });
 
   outputCanvas.addEventListener("mousemove", function(e) {
     if (!isDragging) return;
-    var pt = getCanvasCoords(e);
+    const pt = getCanvasCoords(e);
     renderRightMaskedView();
 
     ctx.save();
@@ -794,12 +804,12 @@
   outputCanvas.addEventListener("mouseup", function(e) {
     if (!isDragging) return;
     isDragging = false;
-    var pt = getCanvasCoords(e);
+    const pt = getCanvasCoords(e);
 
-    var x1 = Math.min(dragStartX, pt.x);
-    var y1 = Math.min(dragStartY, pt.y);
-    var x2 = Math.max(dragStartX, pt.x);
-    var y2 = Math.max(dragStartY, pt.y);
+    const x1 = Math.min(dragStartX, pt.x);
+    const y1 = Math.min(dragStartY, pt.y);
+    const x2 = Math.max(dragStartX, pt.x);
+    const y2 = Math.max(dragStartY, pt.y);
 
     if (x2 - x1 > 8 && y2 - y1 > 8) {
       manualBoxes.push([
@@ -813,37 +823,34 @@
   });
 
   document.getElementById("copyTitleBtn").addEventListener("click", function() {
-    var title = document.getElementById("suggestedTitle").value;
+    const title = document.getElementById("suggestedTitle").value;
     if (!title) return;
     navigator.clipboard.writeText(title);
     alert("Title copied to clipboard!");
   });
 
-  // Resilient multi-tier fallback with retirement & deprecation detection
   async function callGeminiWithFallback(key, body, initialModel) {
-    var candidateModels = [
+    const candidateModels = [
       initialModel,
+      "gemini-3.1-flash-lite",
       "gemini-3.5-flash-lite",
-      "gemini-flash-latest",
-      "gemini-3.5-flash",
       "gemini-2.5-flash-lite"
     ].filter(function(v, i, a) { return v && a.indexOf(v) === i; });
 
-    var lastError = null;
-    for (var i = 0; i < candidateModels.length; i++) {
-      var model = candidateModels[i];
+    let lastError = null;
+    for (let i = 0; i < candidateModels.length; i++) {
+      const model = candidateModels[i];
       try {
-        var response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(model) + ":generateContent?key=" + encodeURIComponent(key), {
+        const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(model) + ":generateContent?key=" + encodeURIComponent(key), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body)
         });
-        var data = await response.json();
+        const data = await response.json();
         if (!response.ok || data.error) {
-          var errMsg = (data.error && data.error.message) ? data.error.message.toLowerCase() : "";
-          var errCode = (data.error && data.error.code) ? data.error.code : response.status;
+          const errMsg = (data.error && data.error.message) ? data.error.message.toLowerCase() : "";
+          const errCode = (data.error && data.error.code) ? data.error.code : response.status;
           
-          // Catch not found, retired, or deprecated endpoints and continue to the next model
           if (errCode === 404 || errCode === 410 || errMsg.indexOf("not found") !== -1 || errMsg.indexOf("no longer available") !== -1 || errMsg.indexOf("deprecated") !== -1) {
             lastError = new Error(data.error.message);
             continue;
@@ -856,11 +863,11 @@
         continue;
       }
     }
-    throw lastError || new Error("All active Gemini models failed.");
+    throw lastError || new Error("All candidate Lite models failed.");
   }
 
   document.getElementById("downloadBtn").addEventListener("click", function() {
-    var link = document.createElement("a");
+    const link = document.createElement("a");
     link.download = "sanitized-deal-asset.png";
     link.href = outputCanvas.toDataURL("image/png");
     link.click();
