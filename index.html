@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Deal Sanitizer & Auto-Masker v1.2.29</title>
+  <title>Deal Sanitizer & Auto-Masker v1.2.30</title>
   <style>
     body { 
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
@@ -177,7 +177,7 @@
 </head>
 <body>
 
-<div class="app-version-fixed">v1.2.29</div>
+<div class="app-version-fixed">v1.2.30</div>
 
 <div class="container">
   <!-- TOP CARD: CONTROLS & API -->
@@ -185,7 +185,7 @@
     <div style="margin-bottom: 1rem;">
       <h2 style="margin: 0; font-size: 1.4rem;">
         Automated Deal Asset Sanitizer 
-        <span class="version-header-badge">v1.2.29</span>
+        <span class="version-header-badge">v1.2.30</span>
       </h2>
     </div>
 
@@ -473,41 +473,30 @@
 
     try {
       const detectPrompt = `
-      You are an automated Intellectual Property & Trademark Sanitizer.
-      Return SNUG, TIGHT bounding boxes [ymin, xmin, ymax, xmax] (0-1000 integers).
-      CRITICAL: NEVER CREATE OVERSIZED RECTANGLES THAT COVER NON-TRADEMARK BACKGROUND ARTWORK.
+      You are an automated Intellectual Property & Regulatory Compliance Auditor.
+      Your objective is to identify and return precise bounding boxes [ymin, xmin, ymax, xmax] (integers 0-1000) for all elements that trigger automated IP, trademark, or ad policy flags on social media.
 
-      EXACT TARGET RULES:
+      UNIVERSAL TARGET RULES:
+      1. TRADEMARKS & BRANDING:
+         - Any brand wordmark, corporate logo, cursive signature, emblem, or character mascot.
+         - Secondary brand names, co-branding marks, and any text bearing a registered symbol (™ or ®).
+      2. REGULATORY & RESTRICTED CLAIMS:
+         - Health, medical, viral, and bacterial claims (e.g., kill rates like '99.9%', viral names, 'disinfectant', 'sanitizer', 'antibacterial').
+         - Unsubstantiated efficacy banners and testing claim lines.
+      3. ITEMIZATION REQUIREMENT:
+         - Each discrete visual element or text block MUST receive its own independent, tightly-fitted bounding box.
+         - NEVER merge distinct, separated text blocks into a single large bounding box.
 
-      1. MULTI-PACK CANS (e.g. Febreze 3-Packs):
-         - Return an INDIVIDUAL vertical column box for EACH can body covering: cursive brand name + 'AIR' + 'SANITIZER'.
-           * DO NOT cover the negative space between cans.
-           * Width of each can's box MUST NOT exceed 18% of image width (xmax - xmin <= 180).
-         - Return one slim horizontal strip specifically over the red claim banner directly above '3-PACK'.
-         - Return small slim strips over 'SCIENTIFICALLY PROVEN' at the top of each can collar.
+      UNIVERSAL WHITELIST (DO NOT COVER):
+      - Standard product category terms (e.g., 'Laundry Detergent', 'Shampoo', 'Conditioner', 'Air Refresher', 'Body Wash', 'Fabric Softener').
+      - Quantities, weights, and counts (e.g., fluid ounces, pack counts, liters, piece counts).
+      - Scent descriptions and ingredient callouts (e.g., 'Crisp Linen', 'Lavender', 'Aloe').
+      - General product photography, packaging handles, lids, and structural container silhouettes.
 
-      2. LIQUID JUGS & ASYMMETRICAL BOTTLES (e.g. Lysol):
-         - UPPER SHIELD MASK (One Unified Box):
-           * Anchor from the dark blue neck collar down to the red curve directly above 'LAUNDRY'.
-           * Set xmin to 0 so the entire left flank red burst badge ('KILLS 99.9%') is submerged together with the diagonal brand name and arched neck claims.
-           * Stop strictly ABOVE 'LAUNDRY' (do not touch 'LAUNDRY').
-         - SANITIZER STRIP:
-           * Return a tight horizontal strip over the word 'SANITIZER'.
-           * Keep 'LAUNDRY' clean above, and 'CRISP LINEN SCENT' clean below.
-
-      3. POUCHES & PACKS (e.g. Arm & Hammer):
-         - Snug circular box over hammer emblem.
-         - Snug box over 'plus OxiClean / ODOR BLASTERS'.
-         - Snug box over 'fresh burst™' in bottom right corner.
-
-      WHITELIST (NEVER COVER):
-      - 'LAUNDRY', 'CRISP LINEN SCENT', '3-PACK 10 Fl.Oz Each', '72 PAKS', '90 FL OZ', '5 in 1 POWER PAKS', 'Simple Fresh Scent'.
-      - Laundry pods, clothing graphics, jug handles, background negative space.
-
-      Return ONLY valid JSON:
+      Return ONLY valid JSON matching this schema:
       {
         "boxes": [[ymin, xmin, ymax, xmax]],
-        "suggested_title": "..."
+        "suggested_title": "Clean, generic, trademark-free product title"
       }
       `;
 
@@ -645,19 +634,23 @@
     off.height = srcH;
     const offCtx = off.getContext("2d");
 
-    // Dominant tone sampling
+    // Sample a 2px outer border around the bounding box to capture the genuine background packaging tone
     const sampleCanvas = document.createElement("canvas");
-    sampleCanvas.width = 1;
-    sampleCanvas.height = 1;
+    sampleCanvas.width = 4;
+    sampleCanvas.height = 4;
     const sCtx = sampleCanvas.getContext("2d");
-    sCtx.drawImage(loadedImage, x, y, rw, Math.max(2, Math.round(rh * 0.35)), 0, 0, 1, 1);
+
+    // Sample from just above the bounding box to grab the packaging background rather than text ink
+    const sampleY = Math.max(0, y - 4);
+    sCtx.drawImage(loadedImage, x, sampleY, Math.max(4, rw), 2, 0, 0, 4, 4);
     let [r, g, b] = sCtx.getImageData(0, 0, 1, 1).data;
 
+    // Apply baseline luminance floor to avoid dark shadow artifacts
     const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
-    if (luminance < 75) {
-      r = Math.min(240, r + 60);
-      g = Math.min(240, g + 60);
-      b = Math.min(240, b + 60);
+    if (luminance < 60) {
+      r = Math.min(235, r + 70);
+      g = Math.min(235, g + 70);
+      b = Math.min(235, b + 70);
     }
 
     // Scramble typography vectors
