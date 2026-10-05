@@ -627,8 +627,7 @@
     off.height = srcH;
     const offCtx = off.getContext("2d");
 
-    // Sample the bottle/package surface: sample 4 distinct perimeter points (top, bottom, left, right)
-    // and pick the brightest point to ensure we capture clean packaging background instead of dark typography
+    // Sample the package surface from 4 perimeter points and pick the brightest to capture packaging background
     const samplePoints = [
       { sx: x + rw * 0.5, sy: Math.max(0, y - 5) },
       { sx: x + rw * 0.5, sy: Math.min(loadedImage.naturalHeight - 1, y + rh + 5) },
@@ -652,12 +651,12 @@
       }
     });
 
-    // If sampling a white bottle with blue hues, keep it clean ambient white/neutral
     if (maxLum > 180) {
       r = Math.min(255, r + 15);
       g = Math.min(255, g + 15);
       b = Math.min(255, b + 15);
     }
+
     const scale = 0.02;
     const mini = document.createElement("canvas");
     mini.width = Math.max(2, Math.floor(srcW * scale));
@@ -693,14 +692,12 @@
     maskCanvas.height = rh;
     const mCtx = maskCanvas.getContext("2d");
 
-    // For slim single-line text (like SANITIZER, rh < 35), do NOT feather or blur the mask
-    // Feathering thin boxes reduces opacity down to 15%, making text show right through
+    // Thin text strips (rh < 35) skip blur so small lines stay opaque and fully masked
     const isThinStrip = Math.min(rw, rh) < 35;
     const feather = isThinStrip ? 0 : Math.max(1, Math.min(6, Math.round(Math.min(rw, rh) * 0.07)));
 
     mCtx.fillStyle = "#ffffff";
     if (feather === 0) {
-      // Solid opaque stamp for small text strips
       mCtx.fillRect(0, 0, rw, rh);
     } else if (isBorderSnapped) {
       mCtx.fillRect(0, 0, rw - feather, rh);
