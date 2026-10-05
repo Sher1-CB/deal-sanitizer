@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Deal Sanitizer & Auto-Masker v1.2.35</title>
+  <title>Deal Sanitizer & Auto-Masker v1.2.36</title>
   <style>
     body { 
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
@@ -118,6 +118,11 @@
       padding: 1.25rem;
       border-radius: 8px;
       box-shadow: 0 4px 6px -1px rgba(0,0,0,0.5);
+      border: 2px dashed transparent;
+      transition: border-color 0.2s;
+    }
+    .canvas-panel.drag-over {
+      border-color: #38bdf8;
     }
 
     .canvas-panel h3 {
@@ -143,6 +148,13 @@
       color: #94a3b8; 
       margin-bottom: 0.75rem; 
       text-align: center; 
+    }
+
+    .status-badge {
+      font-size: 0.75rem;
+      color: #38bdf8;
+      margin-top: 0.35rem;
+      display: block;
     }
 
     .compliance-reminder-box {
@@ -175,14 +187,14 @@
 </head>
 <body>
 
-<div class="app-version-fixed">v1.2.35</div>
+<div class="app-version-fixed">v1.2.36</div>
 
 <div class="container">
   <div class="card">
     <div style="margin-bottom: 1rem;">
       <h2 style="margin: 0; font-size: 1.4rem;">
         Automated Deal Asset Sanitizer 
-        <span class="version-header-badge">v1.2.35</span>
+        <span class="version-header-badge">v1.2.36</span>
       </h2>
     </div>
 
@@ -190,20 +202,24 @@
       <div>
         <label>Gemini API Key</label>
         <input type="password" id="apiKey" placeholder="AIzaSy...">
+        <span id="keyStatus" class="status-badge">Key not set</span>
       </div>
       <div>
-        <label>Gemini Model</label>
+        <label id="modelSelectLabel">Gemini Model</label>
         <select id="modelSelect">
-          <option value="gemini-2.5-flash-lite" selected>gemini-2.5-flash-lite (Recommended)</option>
-          <option value="gemini-2.0-flash-lite">gemini-2.0-flash-lite</option>
-          <option value="gemini-1.5-flash-8b">gemini-1.5-flash-8b</option>
+          <option value="gemini-flash-lite-latest" selected>gemini-flash-lite-latest (Recommended)</option>
+          <option value="gemini-3.5-flash-lite">gemini-3.5-flash-lite</option>
+          <option value="gemini-flash-latest">gemini-flash-latest</option>
+          <option value="gemini-3.5-flash">gemini-3.5-flash</option>
+          <option value="gemini-2.5-flash-lite">gemini-2.5-flash-lite</option>
           <option value="gemini-2.5-flash">gemini-2.5-flash</option>
-          <option value="gemini-1.5-flash">gemini-1.5-flash</option>
         </select>
+        <span id="modelStatus" class="status-badge">Default pool ready</span>
       </div>
       <div>
         <label>Product Image</label>
         <input type="file" id="imageInput" accept="image/*">
+        <span id="uploadStatus" class="status-badge">Supports File, Drag & Drop, Ctrl+V</span>
       </div>
       <div>
         <label>Sanitization Scope</label>
@@ -244,13 +260,13 @@
   </div>
 
   <div class="dual-preview-grid">
-    <div class="canvas-panel">
+    <div class="canvas-panel" id="leftPanel">
       <h3><span>🎯</span> Detected Target Areas (Audit View)</h3>
       <div class="hint">Shows red outlines around detected trademarks and restricted claim text.</div>
       <canvas id="targetCanvas"></canvas>
     </div>
 
-    <div class="canvas-panel">
+    <div class="canvas-panel" id="rightPanel">
       <h3><span>✨</span> Masked Output Preview (Interactive)</h3>
       <div class="hint">💡 Click and drag directly on this canvas to manually patch any missed secondary text.</div>
       <canvas id="outputCanvas"></canvas>
@@ -291,90 +307,175 @@
   const ctx = outputCanvas.getContext("2d");
 
   const keyInput = document.getElementById("apiKey");
+  const keyStatus = document.getElementById("keyStatus");
+  const modelStatus = document.getElementById("modelStatus");
+  const uploadStatus = document.getElementById("uploadStatus");
+
   const savedKey = localStorage.getItem("deal_gemini_key");
-  if (savedKey) keyInput.value = savedKey;
+  if (savedKey) {
+    keyInput.value = savedKey;
+    keyStatus.textContent = "Saved key loaded";
+    autoDetectLiteModel(savedKey);
+  }
 
-  // DYNAMIC MODEL SELECTION WITH SAFE FALLBACKS
+  // ROBUST DYNAMIC MODEL DETECTION (Prioritizes Active 2026 Fast/Lite Tiers)
   async function autoDetectLiteModel(key) {
-    const select = document.getElementById("modelSelect");
-    
-    const defaults = [
-      "gemini-2.5-flash-lite",
-      "gemini-2.0-flash-lite",
-      "gemini-1.5-flash-8b",
-      "gemini-2.5-flash",
-      "gemini-1.5-flash"
-    ];
-
     if (!key) return;
+    const select = document.getElementById("modelSelect");
 
     try {
+      modelStatus.textContent = "Querying account permissions...";
       const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`);
       const data = await res.json();
       
-      if (!data.models || !Array.isArray(data.models)) {
+      if (!res.ok || !data.models || !Array.isArray(data.models)) {
+        modelStatus.textContent = "Using active default models";
         return;
       }
 
-      const allGenModels = data.models
+      // Filter for generation-capable models
+      const generativeModels = data.models
+        .filter(m => m.supportedGenerationMethods?.includes("generateContent"))
         .map(m => m.name.replace("models/", ""))
         .filter(n => {
           const l = n.toLowerCase();
-          return l.includes("gemini") && !l.includes("preview") && !l.includes("embedding") && !l.includes("aqa");
+          return l.includes("gemini") && !l.includes("embedding") && !l.includes("aqa");
         });
 
-      if (allGenModels.length === 0) return;
+      if (generativeModels.length === 0) {
+        modelStatus.textContent = "Default models active";
+        return;
+      }
 
-      const litePool = allGenModels.filter(n => {
-        const l = n.toLowerCase();
-        return l.includes("lite") || l.includes("8b");
-      });
+      // Priority lineup for fast & compliant image scanning
+      const preferredPriorities = [
+        "gemini-flash-lite-latest",
+        "gemini-3.5-flash-lite",
+        "gemini-flash-latest",
+        "gemini-3.5-flash",
+        "gemini-2.5-flash-lite",
+        "gemini-2.5-flash"
+      ];
 
-      const candidatePool = litePool.length > 0 ? litePool : allGenModels;
-
-      const versionMap = {};
-      candidatePool.forEach(n => {
-        const m = n.match(/gemini-(\d+(?:\.\d+)?)/i);
-        if (m) {
-          const v = parseFloat(m[1]);
-          if (!versionMap[v]) versionMap[v] = [];
-          versionMap[v].push(n);
-        }
-      });
-
-      const sortedVersions = Object.keys(versionMap).map(Number).sort((a,b) => b - a);
-      let targetVersion = sortedVersions[0];
-      if (sortedVersions.length >= 3) targetVersion = sortedVersions[2];
-      else if (sortedVersions.length === 2) targetVersion = sortedVersions[1];
-
-      const chosenGroup = versionMap[targetVersion] || candidatePool;
-      const autoSelected = chosenGroup[0] || allGenModels[0];
+      let bestModel = preferredPriorities.find(p => generativeModels.includes(p)) 
+        || generativeModels.find(m => m.toLowerCase().includes("lite"))
+        || generativeModels.find(m => m.toLowerCase().includes("flash"))
+        || generativeModels[0];
 
       select.innerHTML = "";
+      
       const optAuto = document.createElement("option");
-      optAuto.value = autoSelected;
-      optAuto.textContent = `${autoSelected} (Auto: High Quota)`;
+      optAuto.value = bestModel;
+      optAuto.textContent = `${bestModel} (Auto-Detected Active)`;
       optAuto.selected = true;
       select.appendChild(optAuto);
 
-      allGenModels.filter(m => m !== autoSelected).forEach(m => {
+      generativeModels.filter(m => m !== bestModel).forEach(m => {
         const opt = document.createElement("option");
         opt.value = m;
         opt.textContent = m;
         select.appendChild(opt);
       });
 
+      modelStatus.textContent = `Connected: ${bestModel}`;
+      keyStatus.textContent = "Valid API Key";
+
     } catch (err) {
-      console.warn("Model detection network issue:", err);
+      console.warn("Model detection error:", err);
+      modelStatus.textContent = "Using fallback models";
     }
   }
 
-  keyInput.addEventListener("change", () => {
-    const val = keyInput.value.trim();
-    localStorage.setItem("deal_gemini_key", val);
-    if (val) autoDetectLiteModel(val);
+  // Listen to input, paste, and change events on the API Key
+  ['input', 'change', 'paste'].forEach(evtType => {
+    keyInput.addEventListener(evtType, () => {
+      setTimeout(() => {
+        const val = keyInput.value.trim();
+        localStorage.setItem("deal_gemini_key", val);
+        if (val.length > 15) autoDetectLiteModel(val);
+      }, 50);
+    });
   });
-  if (savedKey) autoDetectLiteModel(savedKey);
+
+  // UNIFIED IMAGE LOADING PIPELINE (File, Drag & Drop, Clipboard)
+  function handleImageFile(file) {
+    if (!file || !file.type.startsWith("image/")) {
+      alert("Please upload a valid image file (JPG, PNG, WebP).");
+      return;
+    }
+
+    imageMimeType = file.type || "image/jpeg";
+    uploadStatus.textContent = `Reading ${file.name || 'image'}...`;
+
+    const reader = new FileReader();
+    reader.onload = function(evt) {
+      base64Image = evt.target.result.split(",")[1];
+      loadedImage = new Image();
+      loadedImage.onload = () => {
+        targetCanvas.width = loadedImage.naturalWidth;
+        targetCanvas.height = loadedImage.naturalHeight;
+        outputCanvas.width = loadedImage.naturalWidth;
+        outputCanvas.height = loadedImage.naturalHeight;
+        rawAiBoxes = [];
+        manualBoxes = [];
+        document.getElementById("complianceReminder").style.display = "none";
+        renderLeftTargetView();
+        renderRightMaskedView();
+        uploadStatus.textContent = `Loaded: ${loadedImage.naturalWidth}x${loadedImage.naturalHeight}px`;
+      };
+      loadedImage.onerror = () => {
+        alert("Failed to decode image data.");
+        uploadStatus.textContent = "Image decode failed";
+      };
+      loadedImage.src = evt.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  // 1. File Input Click
+  const imageInput = document.getElementById("imageInput");
+  imageInput.addEventListener("click", () => {
+    imageInput.value = ""; // Ensure re-selecting the same file fires change
+  });
+  imageInput.addEventListener("change", function(e) {
+    if (e.target.files && e.target.files[0]) {
+      handleImageFile(e.target.files[0]);
+    }
+  });
+
+  // 2. Drag & Drop Support
+  const dropTargets = [window, document.getElementById("leftPanel"), document.getElementById("rightPanel")];
+  dropTargets.forEach(el => {
+    el.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      document.getElementById("leftPanel").classList.add("drag-over");
+      document.getElementById("rightPanel").classList.add("drag-over");
+    });
+    el.addEventListener("dragleave", (e) => {
+      e.preventDefault();
+      document.getElementById("leftPanel").classList.remove("drag-over");
+      document.getElementById("rightPanel").classList.remove("drag-over");
+    });
+    el.addEventListener("drop", (e) => {
+      e.preventDefault();
+      document.getElementById("leftPanel").classList.remove("drag-over");
+      document.getElementById("rightPanel").classList.remove("drag-over");
+      if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+        handleImageFile(e.dataTransfer.files[0]);
+      }
+    });
+  });
+
+  // 3. Clipboard Paste (Ctrl+V)
+  window.addEventListener("paste", (e) => {
+    const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+    for (let item of items) {
+      if (item.kind === "file" && item.type.startsWith("image/")) {
+        handleImageFile(item.getAsFile());
+        break;
+      }
+    }
+  });
 
   function enforceSafeTitle(rawTitle) {
     if (!rawTitle) return "";
@@ -404,33 +505,9 @@
     if (/power\s+paks/i.test(safe) && !/laundry\s+detergent/i.test(safe)) {
       safe = safe.replace(/(?:5\s+in\s+1\s+)?power\s+paks/i, "5-in-1 Laundry Detergent Power Paks");
     }
+    safe = safe.replace(/\b(\w+)\s+\1\b/gi, "$1");
     return safe.replace(/\s+/g, " ").trim();
   }
-
-  document.getElementById("imageInput").addEventListener("change", function(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    imageMimeType = file.type || "image/jpeg";
-    const reader = new FileReader();
-    reader.onload = function(evt) {
-      base64Image = evt.target.result.split(",")[1];
-      loadedImage = new Image();
-      loadedImage.onload = () => {
-        targetCanvas.width = loadedImage.naturalWidth;
-        targetCanvas.height = loadedImage.naturalHeight;
-        outputCanvas.width = loadedImage.naturalWidth;
-        outputCanvas.height = loadedImage.naturalHeight;
-        rawAiBoxes = [];
-        manualBoxes = [];
-        document.getElementById("complianceReminder").style.display = "none";
-        renderLeftTargetView();
-        renderRightMaskedView();
-      };
-      loadedImage.src = evt.target.result;
-    };
-    reader.readAsDataURL(file);
-  });
 
   document.getElementById("resetMasksBtn").addEventListener("click", () => {
     if (!loadedImage) return;
@@ -450,10 +527,10 @@
     document.getElementById("suggestedTitle").value = "";
     document.getElementById("downloadBtn").style.display = "none";
     document.getElementById("complianceReminder").style.display = "none";
+    uploadStatus.textContent = "Choose image or drag/paste";
     
-    const fileInput = document.getElementById("imageInput");
-    fileInput.value = "";
-    fileInput.click();
+    imageInput.value = "";
+    imageInput.click();
   });
 
   document.getElementById("reapplyBtn").addEventListener("click", () => {
@@ -477,11 +554,11 @@
     const selectedModel = document.getElementById("modelSelect").value;
 
     if (!key) return alert("Please enter your Gemini API Key.");
-    if (!base64Image) return alert("Please select an image first.");
+    if (!base64Image) return alert("Please upload or paste an image first.");
 
     const btn = document.getElementById("processBtn");
     btn.disabled = true;
-    btn.innerText = "Analyzing targets & packaging boundaries...";
+    btn.innerText = "Auditing trademarks & claims with AI...";
 
     try {
       const detectPrompt = `
@@ -648,7 +725,6 @@
     off.height = srcH;
     const offCtx = off.getContext("2d");
 
-    // Perimeter multi-point sampling to select ambient tone
     const samplePoints = [
       { sx: x + rw * 0.5, sy: Math.max(0, y - 5) },
       { sx: x + rw * 0.5, sy: Math.min(loadedImage.naturalHeight - 1, y + rh + 5) },
@@ -713,7 +789,6 @@
     maskCanvas.height = rh;
     const mCtx = maskCanvas.getContext("2d");
 
-    // Thin text strips (rh < 35) skip blur so small lines stay opaque and fully masked
     const isThinStrip = Math.min(rw, rh) < 35;
     const feather = isThinStrip ? 0 : Math.max(1, Math.min(6, Math.round(Math.min(rw, rh) * 0.07)));
 
@@ -848,9 +923,11 @@
   async function callGeminiWithFallback(key, body, initialModel) {
     const candidateModels = [
       initialModel,
+      "gemini-flash-lite-latest",
+      "gemini-3.5-flash-lite",
+      "gemini-flash-latest",
+      "gemini-3.5-flash",
       "gemini-2.5-flash-lite",
-      "gemini-2.0-flash-lite",
-      "gemini-1.5-flash-8b",
       "gemini-2.5-flash"
     ].filter((v, i, a) => v && a.indexOf(v) === i);
 
@@ -876,7 +953,7 @@
         continue;
       }
     }
-    throw lastError || new Error("All candidate Lite models failed.");
+    throw lastError || new Error("All active fast models failed.");
   }
 
   document.getElementById("downloadBtn").addEventListener("click", () => {
