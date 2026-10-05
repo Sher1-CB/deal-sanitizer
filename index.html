@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Deal Sanitizer & Auto-Masker v1.2.36</title>
+  <title>Deal Sanitizer & Auto-Masker v1.2.37</title>
   <style>
     body { 
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
@@ -175,14 +175,14 @@
 </head>
 <body>
 
-<div class="app-version-fixed">v1.2.36</div>
+<div class="app-version-fixed">v1.2.37</div>
 
 <div class="container">
   <div class="card">
     <div style="margin-bottom: 1rem;">
       <h2 style="margin: 0; font-size: 1.4rem;">
         Automated Deal Asset Sanitizer 
-        <span class="version-header-badge">v1.2.36</span>
+        <span class="version-header-badge">v1.2.37</span>
       </h2>
     </div>
 
@@ -194,11 +194,10 @@
       <div>
         <label>Gemini Model</label>
         <select id="modelSelect">
-          <option value="gemini-2.5-flash-lite" selected>gemini-2.5-flash-lite (Recommended)</option>
+          <option value="gemini-2.5-flash-lite" selected>gemini-2.5-flash-lite (Active)</option>
+          <option value="gemini-flash-latest">gemini-flash-latest</option>
           <option value="gemini-2.0-flash-lite">gemini-2.0-flash-lite</option>
-          <option value="gemini-1.5-flash-8b">gemini-1.5-flash-8b</option>
           <option value="gemini-2.5-flash">gemini-2.5-flash</option>
-          <option value="gemini-1.5-flash">gemini-1.5-flash</option>
         </select>
       </div>
       <div>
@@ -294,6 +293,7 @@
   const savedKey = localStorage.getItem("deal_gemini_key");
   if (savedKey) keyInput.value = savedKey;
 
+  // Query API and lock strictly onto the newest generation
   async function autoDetectLiteModel(key) {
     const select = document.getElementById("modelSelect");
     if (!key) return;
@@ -314,7 +314,7 @@
 
       var litePool = genModels.filter(function(n) {
         var l = n.toLowerCase();
-        return l.indexOf("lite") !== -1 || l.indexOf("8b") !== -1;
+        return l.indexOf("lite") !== -1 || l.indexOf("flash") !== -1;
       });
       var candidatePool = litePool.length > 0 ? litePool : genModels;
 
@@ -329,10 +329,7 @@
       });
 
       var sortedVersions = Object.keys(versionMap).map(Number).sort(function(a, b) { return b - a; });
-      var targetVersion = sortedVersions[0];
-      if (sortedVersions.length >= 3) targetVersion = sortedVersions[2];
-      else if (sortedVersions.length === 2) targetVersion = sortedVersions[1];
-
+      var targetVersion = sortedVersions[0]; // Select newest available tier
       var chosenGroup = versionMap[targetVersion] || candidatePool;
       var autoSelected = chosenGroup[0] || genModels[0];
 
@@ -351,7 +348,7 @@
       });
 
     } catch (err) {
-      console.warn("Dynamic model auto-detection error:", err);
+      console.warn("Model detection error:", err);
     }
   }
 
@@ -467,7 +464,7 @@
 
     var btn = document.getElementById("processBtn");
     btn.disabled = true;
-    btn.innerText = "Analyzing targets & packaging boundaries...";
+    btn.innerText = "Auditing packaging boundaries...";
 
     try {
       var detectPrompt = "You are an automated Intellectual Property & Regulatory Compliance Auditor conducting an exhaustive visual sweep.\n" +
@@ -477,7 +474,6 @@
       "   - The word 'SANITIZER' or 'DISINFECTANT' wherever it appears. Box it snugly without touching 'LAUNDRY'.\n" +
       "   - Scientific and testing claims: 'SCIENTIFICALLY PROVEN', 'CLINICALLY TESTED'.\n" +
       "   - Virus claims: 'COVID-19', 'COLD & FLU', 'VIRUSES', 'KILLS 99.9%'.\n" +
-      "   - For arched collar claims above brand logos, ensure the top edge (ymin) starts right at the blue neck collar so the words 'COVID-19' and 'VIRUSES' are fully enclosed.\n" +
       "   - Standalone promotional claim badges and starburst seals.\n\n" +
       "2. TRADEMARKS & BRAND NAMES:\n" +
       "   - Primary brand logos, emblems, cursive brand wordmarks, and mascot seals.\n" +
@@ -533,21 +529,21 @@
     }
   });
 
-  function expandBoxSnug(box) {
+  // Dynamically uses the dropdown margin ratio
+  function expandBoxDynamic(box, userRatio) {
     var ymin = box[0], xmin = box[1], ymax = box[2], xmax = box[3];
     var w = xmax - xmin;
     var h = ymax - ymin;
 
-    // Snug padding that preserves neighboring lines
-    var padX = Math.max(3, Math.round(w * 0.04));
-    var padY = Math.max(2, Math.round(h * 0.03));
+    var ratio = userRatio === "auto" ? 0.04 : parseFloat(userRatio);
+    var padX = Math.max(3, Math.round(w * ratio));
+    var padY = Math.max(2, Math.round(h * (ratio * 0.75)));
 
     var newYmin = Math.max(0, ymin - padY);
     var newXmin = Math.max(0, xmin - padX);
     var newYmax = Math.min(1000, ymax + padY);
     var newXmax = Math.min(1000, xmax + padX);
 
-    // Only snap to the absolute image border if the box already touches the outer edge (<= 3%)
     if (xmin <= 30) newXmin = 0;
     if (xmax >= 970) newXmax = 1000;
 
@@ -584,7 +580,8 @@
     ctx.drawImage(loadedImage, 0, 0);
 
     var mode = document.getElementById("maskMode").value;
-    var processedBoxes = rawAiBoxes.map(function(b) { return expandBoxSnug(b); });
+    var userMargin = document.getElementById("paddingSelect").value;
+    var processedBoxes = rawAiBoxes.map(function(b) { return expandBoxDynamic(b, userMargin); });
     var allBoxes = processedBoxes.concat(manualBoxes);
 
     allBoxes.forEach(function(box) {
@@ -626,15 +623,15 @@
     off.height = srcH;
     var offCtx = off.getContext("2d");
 
+    // Sample local packaging corners to avoid picking up outer white backdrops
     var samplePoints = [
-      { sx: x + rw * 0.5, sy: Math.max(0, y - 5) },
-      { sx: x + rw * 0.5, sy: Math.min(loadedImage.naturalHeight - 1, y + rh + 5) },
-      { sx: Math.max(0, x - 5), sy: y + rh * 0.5 },
-      { sx: Math.min(loadedImage.naturalWidth - 1, x + rw + 5), sy: y + rh * 0.5 }
+      { sx: x + Math.round(rw * 0.1), sy: y + Math.round(rh * 0.1) },
+      { sx: x + Math.round(rw * 0.9), sy: y + Math.round(rh * 0.1) },
+      { sx: x + Math.round(rw * 0.5), sy: Math.max(0, y - 3) },
+      { sx: x + Math.round(rw * 0.5), sy: Math.min(loadedImage.naturalHeight - 1, y + rh + 3) }
     ];
 
-    var r = 240, g = 240, b = 240;
-    var maxLum = -1;
+    var validColors = [];
     var pCanvas = document.createElement("canvas");
     pCanvas.width = 1; 
     pCanvas.height = 1;
@@ -645,16 +642,17 @@
       var pixel = pCtx.getImageData(0, 0, 1, 1).data;
       var pr = pixel[0], pg = pixel[1], pb = pixel[2];
       var lum = 0.299 * pr + 0.587 * pg + 0.114 * pb;
-      if (lum > maxLum) {
-        maxLum = lum;
-        r = pr; g = pg; b = pb;
+      // Discard pure white studio backdrops (lum > 248) to prevent color contamination
+      if (lum < 248) {
+        validColors.push({ r: pr, g: pg, b: pb });
       }
     });
 
-    if (maxLum > 180) {
-      r = Math.min(255, r + 15);
-      g = Math.min(255, g + 15);
-      b = Math.min(255, b + 15);
+    // Default fallback color
+    var r = 180, g = 180, b = 180;
+    if (validColors.length > 0) {
+      var median = validColors[Math.floor(validColors.length / 2)];
+      r = median.r; g = median.g; b = median.b;
     }
 
     var scale = 0.02;
@@ -668,9 +666,8 @@
     offCtx.drawImage(mini, 0, 0, mini.width, mini.height, 0, 0, srcW, srcH);
     offCtx.imageSmoothingEnabled = true;
 
-    // Small text lines (like SANITIZER) need full opacity so black ink never bleeds through
-    var isThinStrip = Math.min(rw, rh) < 45;
-    offCtx.fillStyle = isThinStrip 
+    var isCompact = Math.min(rw, rh) < 40;
+    offCtx.fillStyle = isCompact 
       ? "rgba(" + r + ", " + g + ", " + b + ", 1.0)" 
       : "rgba(" + r + ", " + g + ", " + b + ", 0.92)";
     offCtx.fillRect(0, 0, srcW, srcH);
@@ -696,8 +693,7 @@
     maskCanvas.height = rh;
     var mCtx = maskCanvas.getContext("2d");
 
-    var isThinStrip = Math.min(rw, rh) < 35;
-    var feather = isThinStrip ? 0 : Math.max(1, Math.min(6, Math.round(Math.min(rw, rh) * 0.07)));
+    var feather = isCompact ? 0 : Math.max(1, Math.min(5, Math.round(Math.min(rw, rh) * 0.06)));
 
     mCtx.fillStyle = "#ffffff";
     if (feather === 0) {
@@ -831,8 +827,8 @@
     var candidateModels = [
       initialModel,
       "gemini-2.5-flash-lite",
-      "gemini-2.0-flash-lite",
-      "gemini-1.5-flash-8b"
+      "gemini-flash-latest",
+      "gemini-2.0-flash-lite"
     ].filter(function(v, i, a) { return v && a.indexOf(v) === i; });
 
     var lastError = null;
