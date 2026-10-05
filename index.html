@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Deal Sanitizer & Auto-Masker v1.2.52</title>
+  <title>Deal Sanitizer & Auto-Masker v1.2.53</title>
   <style>
     body { 
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
@@ -175,14 +175,14 @@
 </head>
 <body>
 
-<div class="app-version-fixed">v1.2.52</div>
+<div class="app-version-fixed">v1.2.53</div>
 
 <div class="container">
   <div class="card">
     <div style="margin-bottom: 1rem;">
       <h2 style="margin: 0; font-size: 1.4rem;">
         Automated Deal Asset Sanitizer 
-        <span class="version-header-badge">v1.2.52</span>
+        <span class="version-header-badge">v1.2.53</span>
       </h2>
     </div>
 
@@ -473,24 +473,26 @@
 
     try {
       const detectPrompt = `
-      You are an automated Intellectual Property & Platform Compliance Auditor.
-      RULE: Mask ONLY what triggers Copyright, Trademark, IP, or Health/Medical claim strikes. Everything else must remain 100% visible.
+      You are an advanced Intellectual Property & Regulatory Compliance Engine.
+      Execute an audit using this two-step cognitive protocol to achieve 100% legal compliance with zero commercial over-masking:
 
-      STRICT MASK TARGETS (Return tight bounding boxes [ymin, xmin, ymax, xmax] as 0-1000 integers):
-      1. TRADEMARKS & BRAND IP:
-         - Brand names, brand signatures, and manufacturer logos ('Lysol', 'Clorox', 'Arm & Hammer', 'aussie', 'Febreze').
-         - Brand mascots and brand emblems.
-         - Any secondary mark or slogan carrying ™ or ® (e.g., 'fresh burst™', 'ODOR BLASTERS').
-      2. REGULATED MEDICAL / VIRUCIDAL CLAIMS (Platform Policy Triggers):
-         - Words making medical claims: 'SANITIZER' or 'DISINFECTANT' (box only the word itself).
-         - Virus & germ claim lines: 'KILLS 99.9%', 'COVID-19', 'VIRUSES', 'COLD & FLU', 'BACTERIA'.
-         - On multipacks (e.g. 3 spray cans): The red horizontal claim strip ('Eliminates Odors by Killing 99.9%...') must be boxed as a SINGLE wide horizontal banner. Do not run vertical boxes down into the blue packaging.
+      STEP 1: INVENTORY & CLASSIFICATION
+      Classify all visible text and graphics into two strict categories:
+      - [MUST MASK - LEGAL & IP TRIGGERS]:
+        * Brand names, logos, mascots, and cursive signatures ('Lysol', 'Clorox', 'Arm & Hammer', 'aussie', 'Febreze').
+        * Slogans or secondary marks with ™ or ® ('fresh burst™', 'ODOR BLASTERS').
+        * Regulated medical/pesticidal terms: 'SANITIZER', 'DISINFECTANT', 'KILLS 99.9%', 'COVID-19', 'VIRUSES', 'COLD & FLU', 'BACTERIA'.
+        * Curved claim text lines above brand logos ('KILLS COLD, FLU & COVID-19 VIRUSES').
+        * Multipack claim strips: Return a single continuous horizontal box spanning the full width of the red banner.
+      - [NEVER MASK - COMMERCIAL DATA]:
+        * Generic category nouns ('LAUNDRY', 'AIR', 'DETERGENT', 'SHAMPOO', 'CONDITIONER', 'CLEANER').
+        * Volume, weights, and counts ('90 FL OZ', '3-PACK', '10 Fl.Oz Each', '72 PAKS', '16 oz').
+        * Neutral descriptors ('Simple Fresh Scent', 'Crisp Linen Scent', '0% Bleach').
+        * Hardware: Bottle caps, closures, spray nozzles, and blank plastic surfaces.
 
-      STRICT PRESERVE LIST (NEVER MASK):
-      - Generic product nouns: 'LAUNDRY', 'AIR', 'DETERGENT', 'SHAMPOO', 'CONDITIONER', 'CLEANER'.
-      - Fluid ounces, counts, and sizes: '90 FL OZ', '3-PACK', '10 Fl.Oz Each', '72 PAKS', '16 oz'.
-      - Neutral descriptors: 'Simple Fresh Scent', 'Crisp Linen Scent', '0% Bleach', apparel graphics.
-      - Physical hardware: Never box bottle caps, spray nozzles, or handles.
+      STEP 2: COORDINATE EXTRACTION
+      Return tight, normalized bounding boxes [ymin, xmin, ymax, xmax] (0-1000 integers) STRICTLY for the [MUST MASK] items.
+      - Treat stacked words surgically: Box 'SANITIZER' tightly without touching 'LAUNDRY' above it.
 
       Return ONLY valid JSON:
       {
@@ -587,6 +589,37 @@
     tCtx.restore();
   }
 
+  // Edge-Contrast Auto-Snapper: Expands boundaries outward if letters cross border pixels
+  function snapBoxToPackagingEdge(x, y, w, h) {
+    let left = Math.round(x), top = Math.round(y);
+    let right = Math.round(x + w), bottom = Math.round(y + h);
+    const maxExpand = Math.round(outputCanvas.width * 0.025);
+
+    try {
+      // Sample local background color reference
+      const refY = Math.max(0, top - 4);
+      const bgPixel = ctx.getImageData(Math.round(x + w * 0.5), refY, 1, 1).data;
+      const [bgR, bgG, bgB] = [bgPixel[0], bgPixel[1], bgPixel[2]];
+
+      const hasTextContrast = (r, g, b) => (Math.abs(r - bgR) + Math.abs(g - bgG) + Math.abs(b - bgB)) > 65;
+
+      // Expand right boundary if cursive tails or letter strokes cross the right edge
+      let steps = 0;
+      while (steps < maxExpand && right < outputCanvas.width - 2) {
+        const col = ctx.getImageData(right, top, 1, Math.max(1, bottom - top)).data;
+        let edgeBlocked = false;
+        for (let i = 0; i < col.length; i += 16) {
+          if (hasTextContrast(col[i], col[i+1], col[i+2])) { edgeBlocked = true; break; }
+        }
+        if (!edgeBlocked) break;
+        right += 2;
+        steps += 2;
+      }
+    } catch (e) { /* fallback to standard bounds if sampling fails */ }
+
+    return { x: left, y: top, w: right - left, h: bottom - top };
+  }
+
   function renderRightMaskedView() {
     if (!loadedImage) return;
     ctx.clearRect(0, 0, outputCanvas.width, outputCanvas.height);
@@ -599,10 +632,14 @@
 
     allBoxes.forEach(function(box) {
       const ymin = box[0], xmin = box[1], ymax = box[2], xmax = box[3];
-      const x = (xmin / 1000) * outputCanvas.width;
-      const y = (ymin / 1000) * outputCanvas.height;
-      const w = ((xmax - xmin) / 1000) * outputCanvas.width;
-      const h = ((ymax - ymin) / 1000) * outputCanvas.height;
+      let x = (xmin / 1000) * outputCanvas.width;
+      let y = (ymin / 1000) * outputCanvas.height;
+      let w = ((xmax - xmin) / 1000) * outputCanvas.width;
+      let h = ((ymax - ymin) / 1000) * outputCanvas.height;
+
+      // Automatically inspect and snap borders to packaging color
+      const snapped = snapBoxToPackagingEdge(x, y, w, h);
+      x = snapped.x; y = snapped.y; w = snapped.w; h = snapped.h;
 
       if (mode === "ambient") {
         applyAmbientBlock(x, y, w, h);
