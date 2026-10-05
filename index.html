@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Deal Sanitizer & Auto-Masker v1.2.48</title>
+  <title>Deal Sanitizer & Auto-Masker v1.2.49</title>
   <style>
     body { 
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
@@ -175,14 +175,14 @@
 </head>
 <body>
 
-<div class="app-version-fixed">v1.2.48</div>
+<div class="app-version-fixed">v1.2.49</div>
 
 <div class="container">
   <div class="card">
     <div style="margin-bottom: 1rem;">
       <h2 style="margin: 0; font-size: 1.4rem;">
         Automated Deal Asset Sanitizer 
-        <span class="version-header-badge">v1.2.48</span>
+        <span class="version-header-badge">v1.2.49</span>
       </h2>
     </div>
 
@@ -541,7 +541,8 @@
     const h = ymax - ymin;
 
     const ratio = userRatio === "auto" ? 0.05 : parseFloat(userRatio);
-    const padX = Math.max(3, Math.round(w * ratio));
+    // Enforce minimum 6px horizontal safety buffer so initial letters (like 'S') don't peek out
+    const padX = Math.max(6, Math.round(w * ratio));
     
     // Upper arch text sits above the main logo (ymin < 700). It needs upward expansion to swallow curved letters.
     // Lower text (ymin >= 700, like SANITIZER) sits between LAUNDRY and SCENT and stays vertically zero-padded.
