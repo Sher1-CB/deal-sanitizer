@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Deal Sanitizer & Auto-Masker v1.2.26</title>
+  <title>Deal Sanitizer & Auto-Masker v1.2.27</title>
   <style>
     body { 
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
@@ -57,7 +57,7 @@
 
     .top-controls-grid {
       display: grid;
-      grid-template-columns: 1.2fr 1fr 1fr 1fr 1fr;
+      grid-template-columns: 1.2fr 1.2fr 1fr 1fr 1fr 1fr;
       gap: 1rem;
       align-items: start;
     }
@@ -116,7 +116,7 @@
 </head>
 <body>
 
-<div class="app-version-fixed">v1.2.26</div>
+<div class="app-version-fixed">v1.2.27</div>
 
 <div class="container">
   <!-- TOP CARD: API & SETTINGS -->
@@ -124,10 +124,8 @@
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
       <h2 style="margin: 0;">
         Automated Deal Asset Sanitizer 
-        <span class="version-header-badge">v1.2.26</span>
+        <span class="version-header-badge">v1.2.27</span>
       </h2>
-      <div style="font-size: 0.85rem; color: #38bdf8;" id="modelStatus">Active: Detecting model...</div>
-    </div>
 
     <!-- TOP ROW: INPUT CONTROLS -->
     <div class="top-controls-grid">
@@ -136,6 +134,22 @@
         <input type="password" id="apiKey" placeholder="AIzaSy...">
       </div>
       <div>
+        <!-- TOP ROW: INPUT CONTROLS -->
+    <div class="top-controls-grid">
+      <div>
+        <label>Gemini API Key</label>
+        <input type="password" id="apiKey" placeholder="AIzaSy...">
+      </div>
+      <div>
+        <label>Gemini Model</label>
+        <select id="modelSelect">
+          <option value="gemini-2.5-flash-lite" selected>Detecting models...</option>
+        </select>
+      </div>
+      <div>
+        <label>Product Image</label>
+        <input type="file" id="imageInput" accept="image/*">
+      </div>
         <label>Product Image</label>
         <input type="file" id="imageInput" accept="image/*">
       </div>
@@ -237,23 +251,25 @@
   // AUTO-DETECT 3RD-TO-LATEST LITE MODEL DYNAMICALLY
   async function autoDetectLiteModel(key) {
     if (!key) return;
-    const status = document.getElementById("modelStatus");
+    const select = document.getElementById("modelSelect");
 
     try {
-      status.textContent = "Detecting high-quota Lite model...";
       const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`);
       const data = await res.json();
       if (!data.models || !Array.isArray(data.models)) return;
 
-      const liteModels = data.models
+      const genModels = data.models
         .map(m => m.name.replace("models/", ""))
         .filter(n => {
           const l = n.toLowerCase();
-          return l.includes("gemini") && (l.includes("lite") || l.includes("8b")) && !l.includes("preview") && !l.includes("embedding");
+          return l.includes("gemini") && !l.includes("preview") && !l.includes("embedding") && !l.includes("aqa");
         });
 
+      const liteModels = genModels.filter(n => n.toLowerCase().includes("lite") || n.toLowerCase().includes("8b"));
+      const pool = liteModels.length > 0 ? liteModels : genModels;
+
       const versionMap = {};
-      liteModels.forEach(n => {
+      pool.forEach(n => {
         const m = n.match(/gemini-(\d+(?:\.\d+)?)/i);
         if (m) {
           const v = parseFloat(m[1]);
@@ -264,20 +280,28 @@
 
       const sortedVersions = Object.keys(versionMap).map(Number).sort((a,b) => b - a);
       let targetVersion = sortedVersions[0];
-      if (sortedVersions.length >= 3) {
-        targetVersion = sortedVersions[2]; // 3rd latest
-      } else if (sortedVersions.length === 2) {
-        targetVersion = sortedVersions[1];
-      }
+      if (sortedVersions.length >= 3) targetVersion = sortedVersions[2];
+      else if (sortedVersions.length === 2) targetVersion = sortedVersions[1];
 
-      const pool = versionMap[targetVersion] || liteModels;
-      activeSelectedModel = pool[0] || "gemini-2.5-flash-lite";
-      status.textContent = `Active Model: ${activeSelectedModel} (High-Quota Lite)`;
+      const candidates = versionMap[targetVersion] || pool;
+      const autoSelected = candidates[0] || "gemini-2.5-flash-lite";
+
+      select.innerHTML = "";
+      const optAuto = document.createElement("option");
+      optAuto.value = autoSelected;
+      optAuto.textContent = `${autoSelected} (Auto: 3rd-Gen Lite)`;
+      optAuto.selected = true;
+      select.appendChild(optAuto);
+
+      genModels.filter(m => m !== autoSelected).forEach(m => {
+        const opt = document.createElement("option");
+        opt.value = m;
+        opt.textContent = m;
+        select.appendChild(opt);
+      });
 
     } catch (err) {
       console.warn("Model detection error:", err);
-      activeSelectedModel = "gemini-2.5-flash-lite";
-      status.textContent = `Active Model: ${activeSelectedModel}`;
     }
   }
 
@@ -408,11 +432,15 @@
          - Return one slim horizontal strip specifically over the red claim banner directly above '3-PACK'.
          - Return small slim strips over 'SCIENTIFICALLY PROVEN' at the top of each can.
 
-      2. JUGS (e.g. Lysol):
-         - Box A (Brand): Diagonal brand logo only.
-         - Box B (Sanitizer): Slim horizontal strip strictly over 'SANITIZER'. Keep 'LAUNDRY' and 'CRISP LINEN SCENT' clean and visible.
-         - Box C (Flank Badge): If a red burst badge is on the left flank, return a box with xmin: 0.
-         - Box D (Collar Claim): The arched 'KILLS COLD, FLU & VIRUSES' text near collar.
+      2. LIQUID JUGS & ASYMMETRICAL BOTTLES (e.g. Lysol):
+         - UNIFIED UPPER BRAND SHIELD (CRITICAL):
+           * ymin: Start flush against the dark blue plastic neck collar (above 'KILLS COLD, FLU & COVID-19').
+           * xmin: Must be 0 (hard left frame) to encompass the protruding red scalloped burst badge ('KILLS 99.9%').
+           * ymax: Extend down to the red curve directly above 'LAUNDRY'.
+           * Cover the collar claim, diagonal brand logo, and the left burst badge in this one clean, cohesive upper block.
+         - SANITIZER STRIP:
+           * Return a separate horizontal strip directly over the single word 'SANITIZER'.
+           * Keep 'LAUNDRY' and 'CRISP LINEN SCENT' clean and legible.
 
       3. POUCHES (e.g. Arm & Hammer):
          - Snug circular box over hammer emblem.
