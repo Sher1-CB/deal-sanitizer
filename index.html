@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Deal Sanitizer & Auto-Masker v1.2.53</title>
+  <title>Deal Sanitizer & Auto-Masker v1.2.54</title>
   <style>
     body { 
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
@@ -175,14 +175,14 @@
 </head>
 <body>
 
-<div class="app-version-fixed">v1.2.53</div>
+<div class="app-version-fixed">v1.2.54</div>
 
 <div class="container">
   <div class="card">
     <div style="margin-bottom: 1rem;">
       <h2 style="margin: 0; font-size: 1.4rem;">
         Automated Deal Asset Sanitizer 
-        <span class="version-header-badge">v1.2.53</span>
+        <span class="version-header-badge">v1.2.54</span>
       </h2>
     </div>
 
@@ -473,33 +473,35 @@
 
     try {
       const detectPrompt = `
-      You are an advanced Intellectual Property & Regulatory Compliance Engine.
-      Execute an audit using this two-step cognitive protocol to achieve 100% legal compliance with zero commercial over-masking:
+    You are an advanced Intellectual Property & Regulatory Compliance Engine.
+    Execute an audit using this two-step cognitive protocol to achieve 100% legal compliance with zero commercial over-masking:
 
-      STEP 1: INVENTORY & CLASSIFICATION
-      Classify all visible text and graphics into two strict categories:
-      - [MUST MASK - LEGAL & IP TRIGGERS]:
-        * Brand names, logos, mascots, and cursive signatures ('Lysol', 'Clorox', 'Arm & Hammer', 'aussie', 'Febreze').
-        * Slogans or secondary marks with ™ or ® ('fresh burst™', 'ODOR BLASTERS').
-        * Regulated medical/pesticidal terms: 'SANITIZER', 'DISINFECTANT', 'KILLS 99.9%', 'COVID-19', 'VIRUSES', 'COLD & FLU', 'BACTERIA'.
-        * Curved claim text lines above brand logos ('KILLS COLD, FLU & COVID-19 VIRUSES').
-        * Multipack claim strips: Return a single continuous horizontal box spanning the full width of the red banner.
-      - [NEVER MASK - COMMERCIAL DATA]:
-        * Generic category nouns ('LAUNDRY', 'AIR', 'DETERGENT', 'SHAMPOO', 'CONDITIONER', 'CLEANER').
-        * Volume, weights, and counts ('90 FL OZ', '3-PACK', '10 Fl.Oz Each', '72 PAKS', '16 oz').
-        * Neutral descriptors ('Simple Fresh Scent', 'Crisp Linen Scent', '0% Bleach').
-        * Hardware: Bottle caps, closures, spray nozzles, and blank plastic surfaces.
+    STEP 1: INVENTORY & CLASSIFICATION
+    Classify all visible text and graphics into two strict categories:
+    - [MUST MASK - LEGAL & IP TRIGGERS]:
+      * Brand names, logos, mascots, and signatures ('Lysol', 'Clorox', 'Arm & Hammer', 'aussie', 'Febreze').
+      * Secondary marks or slogans with ™ or ® ('fresh burst™', 'ODOR BLASTERS').
+      * Regulated medical/pesticidal terms: 'SANITIZER', 'DISINFECTANT', 'KILLS 99.9%', 'COVID-19', 'VIRUSES', 'COLD & FLU', 'BACTERIA'.
+      * Curved claim text lines above brand logos ('KILLS COLD, FLU & COVID-19 VIRUSES').
+      * THE RED MULTIPACK BANNER: On multi-can packs, you MUST box the entire red horizontal strip ('Eliminates Odors by Killing 99.9% of Odor-Causing Bacteria and Viruses in the air') from edge to edge.
+    - [NEVER MASK - COMMERCIAL DATA]:
+      * Generic category nouns ('LAUNDRY', 'AIR', 'DETERGENT', 'SHAMPOO', 'CONDITIONER', 'CLEANER').
+      * Volume, weights, and counts ('90 FL OZ', '3-PACK', '10 Fl.Oz Each', '72 PAKS', '16 oz').
+      * Neutral descriptors ('Simple Fresh Scent', 'Crisp Linen Scent', '0% Bleach').
+      * Hardware: Bottle caps, spray nozzles, handles, side contours, and blank plastic surfaces.
 
-      STEP 2: COORDINATE EXTRACTION
-      Return tight, normalized bounding boxes [ymin, xmin, ymax, xmax] (0-1000 integers) STRICTLY for the [MUST MASK] items.
-      - Treat stacked words surgically: Box 'SANITIZER' tightly without touching 'LAUNDRY' above it.
+    STEP 2: COORDINATE EXTRACTION
+    Return tight, normalized bounding boxes [ymin, xmin, ymax, xmax] (0-1000 integers) STRICTLY for the [MUST MASK] items.
+    - Box 'SANITIZER' tightly without touching 'LAUNDRY' or 'AIR'.
+    - Span the red claim banner from the far left can to the far right can in ONE wide horizontal box.
+    - NEVER place a box on the jug handle or blank plastic container surfaces.
 
-      Return ONLY valid JSON:
-      {
-        "boxes": [[ymin, xmin, ymax, xmax]],
-        "suggested_title": "[Count/Volume] + [Generic Product Category] + [Key Safe Feature] + [Generic Scent/Flavor]"
-      }
-      `;
+    Return ONLY valid JSON:
+    {
+      "boxes": [[ymin, xmin, ymax, xmax]],
+      "suggested_title": "[Count/Volume] + [Generic Product Category] + [Key Safe Feature] + [Generic Scent/Flavor]"
+    }
+    `;
 
       const detectData = await callGeminiWithFallback(key, {
         contents: [{
