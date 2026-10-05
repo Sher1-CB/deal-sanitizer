@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Deal Sanitizer & Auto-Masker v1.2.27</title>
+  <title>Deal Sanitizer & Auto-Masker v1.2.28</title>
   <style>
     body { 
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
@@ -177,7 +177,7 @@
 </head>
 <body>
 
-<div class="app-version-fixed">v1.2.27</div>
+<div class="app-version-fixed">v1.2.28</div>
 
 <div class="container">
   <!-- TOP CARD: CONTROLS & API -->
@@ -185,7 +185,7 @@
     <div style="margin-bottom: 1rem;">
       <h2 style="margin: 0; font-size: 1.4rem;">
         Automated Deal Asset Sanitizer 
-        <span class="version-header-badge">v1.2.27</span>
+        <span class="version-header-badge">v1.2.28</span>
       </h2>
     </div>
 
@@ -487,14 +487,10 @@
          - Return small slim strips over 'SCIENTIFICALLY PROVEN' at the top of each can collar.
 
       2. LIQUID JUGS & ASYMMETRICAL BOTTLES (e.g. Lysol):
-         - UNIFIED UPPER BRAND SHIELD (CRITICAL):
-           * ymin: Start directly at the dark blue plastic neck collar (above 'KILLS COLD, FLU & COVID-19').
-           * xmin: Set to 0 (hard left canvas edge) to encompass the protruding red scalloped burst badge ('KILLS 99.9%').
-           * ymax: Extend down to the red separator curve directly above 'LAUNDRY'.
-           * Cover the collar claim, diagonal brand logo, and left starburst badge in this ONE cohesive upper block.
-         - SANITIZER STRIP:
-           * Return a separate horizontal strip directly over the single word 'SANITIZER'.
-           * Keep 'LAUNDRY' and 'CRISP LINEN SCENT' clean and visible.
+         - Target A (Brand Name Only): A tight box around the diagonal cursive brand logo ('Lysol'). Stop ABOVE 'LAUNDRY'.
+         - Target B (Neck Collar Claim): A slim horizontal box across the arched claim line ('KILLS COLD, FLU & COVID-19 VIRUSES') near the dark blue collar.
+         - Target C (Left Flank Red Badge): A dedicated box over the red scalloped burst badge ('KILLS 99.9% OF BACTERIA'). Crucial: Set xmin to 0 so its outer scalloped edge is completely submerged.
+         - Target D (Sanitizer Only): A slim horizontal rectangle strictly over the word 'SANITIZER'. Keep 'LAUNDRY' completely uncovered above it.
 
       3. POUCHES & PACKS (e.g. Arm & Hammer):
          - Snug circular box over hammer emblem.
@@ -565,8 +561,8 @@
     let newXmax = Math.min(1000, xmax + padX);
 
     // Flank edge snap: Snaps side badges flush to canvas borders
-    if (xmin <= 90) newXmin = 0;
-    if (xmax >= 910) newXmax = 1000;
+    if (xmin <= 120) newXmin = 0;
+    if (xmax >= 880) newXmax = 1000;
     if (ymin <= 40) newYmin = 0;
 
     return [newYmin, newXmin, newYmax, newXmax];
