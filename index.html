@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Deal Sanitizer & Auto-Masker v1.2.31</title>
+  <title>Deal Sanitizer & Auto-Masker v1.2.32</title>
   <style>
     body { 
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
@@ -177,7 +177,7 @@
 </head>
 <body>
 
-<div class="app-version-fixed">v1.2.31</div>
+<div class="app-version-fixed">v1.2.32</div>
 
 <div class="container">
   <!-- TOP CARD: CONTROLS & API -->
@@ -185,7 +185,7 @@
     <div style="margin-bottom: 1rem;">
       <h2 style="margin: 0; font-size: 1.4rem;">
         Automated Deal Asset Sanitizer 
-        <span class="version-header-badge">v1.2.31</span>
+        <span class="version-header-badge">v1.2.32</span>
       </h2>
     </div>
 
@@ -478,32 +478,32 @@
 
       MANDATORY DETECTION TARGETS (ZERO-TOLERANCE):
 
-      1. REGULATORY & MEDICAL CLAIMS (CRITICAL):
-         - ANY occurrence of the word 'SANITIZER' or 'DISINFECTANT', regardless of where it appears.
-         - Scientific testing claims: 'SCIENTIFICALLY PROVEN', 'CLINICALLY TESTED', 'LAB TESTED'.
-         - Germ, virus, and bacteria claims: 'KILLS 99.9%', 'COVID-19', 'COLD & FLU', 'VIRUSES', 'BACTERIA'.
-         - Red or brightly colored claim badges, starbursts, and efficacy seals.
+      1. RESTRICTED MEDICAL, VIRAL & REGULATORY TERMS:
+         - The word 'SANITIZER' or 'DISINFECTANT' wherever it appears.
+         - Scientific and testing claims: 'SCIENTIFICALLY PROVEN', 'CLINICALLY TESTED', 'LAB TESTED'.
+         - Efficacy and virus claims: 'KILLS 99.9%', 'COVID-19', 'COLD & FLU', 'VIRUSES', 'BACTERIA'.
+         - Standalone promotional claim badges and starburst seals.
 
-      2. TRADEMARKS & BRAND IDENTIFIERS:
-         - Primary brand logos, cursive signatures, emblems, and corporate crests.
-         - Registered sub-brands, co-brands, and secondary marks bearing ™ or ® (e.g. 'OxiClean', 'Odor Blasters', registered scent names).
+      2. TRADEMARKS & BRAND NAMES:
+         - Primary brand logos, emblems, cursive brand wordmarks, and mascot seals.
+         - Secondary sub-brands, co-brands, or marks accompanied by ™ or ® (e.g. 'OxiClean', 'ODOR BLASTERS', 'fresh burst™').
 
-      3. ITEMIZATION MANDATE:
-         - Scan the packaging from TOP to BOTTOM.
-         - Do not stop after finding the main logo. Return dedicated, tight boxes for EACH separate claim line, badge, and descriptor identified above.
-         - If a product appears as a multi-pack, identify these targets on EVERY individual container shown.
+      3. SURGICAL LINE-BY-LINE ITEMIZATION RULE:
+         - When words appear in stacked lines (e.g., 'LAUNDRY' stacked over 'SANITIZER', or 'AIR' stacked over 'SANITIZER'):
+           * You MUST box ONLY the word 'SANITIZER'.
+           * NEVER box the words 'LAUNDRY' or 'AIR'. Keep their boxes completely separate.
+         - NEVER output one large aggregate block. Return tight, individual boxes hugging each specific mark.
 
-      STRICT WHITELIST (NEVER MASK):
-      - Generic household terms: 'LAUNDRY', 'AIR', 'DETERGENT', 'FABRIC', 'CLEANER'.
-      - Volumes, weights, and counts: '90 FL OZ', '72 PAKS', '3-PACK', '10 Fl.Oz Each', '16 oz'.
-      - Neutral scent names: 'Crisp Linen Scent', 'Fresh Scent', 'Lavender'.
-      - Neutral features: '0% BLEACH', 'ELIMINATES ODORS AT THE SOURCE', '5 in 1 POWER PAKS'.
-      - Product imagery: clothes illustrations, laundry pods, trigger nozzles, handles.
+      STRICT WHITELIST (NEVER COVER):
+      - Common product category terms: 'LAUNDRY', 'AIR', 'DETERGENT', 'FABRIC REFRESHER', '5 in 1 POWER PAKS'.
+      - Quantities and counts: '90 FL OZ', '72 PAKS', '3-PACK', '10 Fl.Oz Each', '16 oz'.
+      - Neutral features: '0% BLEACH', 'ELIMINATES ODORS AT THE SOURCE', 'ELIMINATES TOUGH ODORS'.
+      - Packaging structure: handles, caps, nozzles, laundry pod visuals, clothing illustrations.
 
-      Return ONLY valid JSON:
+      Return ONLY valid JSON matching this schema:
       {
         "boxes": [[ymin, xmin, ymax, xmax]],
-        "suggested_title": "Clean generic compliant product title"
+        "suggested_title": "Generic brand-free compliant title"
       }
       `;
 
@@ -545,24 +545,24 @@
     }
   });
 
-  // Snug expansion: Prevents ballooning on multi-packs and preserves whitelist text
+  // Proportional snug padding: prevents boxes from merging across empty packaging art
   function expandBoxSnug(box) {
     const [ymin, xmin, ymax, xmax] = box;
     const w = xmax - xmin;
     const h = ymax - ymin;
 
-    const padX = Math.round(w * 0.06);
-    const padY = Math.round(h * 0.06);
+    // Tight 4% padding prevents adjacent text and background art from being covered
+    const padX = Math.max(2, Math.round(w * 0.04));
+    const padY = Math.max(2, Math.round(h * 0.04));
 
     let newYmin = Math.max(0, ymin - padY);
     let newXmin = Math.max(0, xmin - padX);
     let newYmax = Math.min(1000, ymax + padY);
     let newXmax = Math.min(1000, xmax + padX);
 
-    // Flank edge snap: Snaps side badges flush to canvas borders
-    if (xmin <= 120) newXmin = 0;
-    if (xmax >= 880) newXmax = 1000;
-    if (ymin <= 40) newYmin = 0;
+    // Flank snap: only snap to 0 if the badge is already against the canvas border
+    if (xmin <= 90) newXmin = 0;
+    if (xmax >= 910) newXmax = 1000;
 
     return [newYmin, newXmin, newYmax, newXmax];
   }
@@ -641,16 +641,22 @@
     off.height = srcH;
     const offCtx = off.getContext("2d");
 
-    // Sample a 2px outer border around the bounding box to capture the genuine background packaging tone
+    // Sample the immediate packaging surface above the text rather than the dark letter ink
     const sampleCanvas = document.createElement("canvas");
-    sampleCanvas.width = 4;
-    sampleCanvas.height = 4;
+    sampleCanvas.width = 1;
+    sampleCanvas.height = 1;
     const sCtx = sampleCanvas.getContext("2d");
-
-    // Sample from just above the bounding box to grab the packaging background rather than text ink
     const sampleY = Math.max(0, y - 4);
-    sCtx.drawImage(loadedImage, x, sampleY, Math.max(4, rw), 2, 0, 0, 4, 4);
+    sCtx.drawImage(loadedImage, x, sampleY, rw, 2, 0, 0, 1, 1);
     let [r, g, b] = sCtx.getImageData(0, 0, 1, 1).data;
+
+    // Lift contrast for light packaging to prevent muddy or dark gray masking
+    const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
+    if (luminance < 80) {
+      r = Math.min(245, r + 50);
+      g = Math.min(245, g + 50);
+      b = Math.min(245, b + 50);
+    }
 
     // Apply baseline luminance floor to avoid dark shadow artifacts
     const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
