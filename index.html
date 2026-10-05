@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Deal Sanitizer & Auto-Masker v1.2.50</title>
+  <title>Deal Sanitizer & Auto-Masker v1.2.52</title>
   <style>
     body { 
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
@@ -175,14 +175,14 @@
 </head>
 <body>
 
-<div class="app-version-fixed">v1.2.50</div>
+<div class="app-version-fixed">v1.2.52</div>
 
 <div class="container">
   <div class="card">
     <div style="margin-bottom: 1rem;">
       <h2 style="margin: 0; font-size: 1.4rem;">
         Automated Deal Asset Sanitizer 
-        <span class="version-header-badge">v1.2.50</span>
+        <span class="version-header-badge">v1.2.52</span>
       </h2>
     </div>
 
@@ -473,24 +473,26 @@
 
     try {
       const detectPrompt = `
-      You are a universal Intellectual Property and Regulatory Compliance Auditor.
-      Inspect this retail packaging image across all categories (bottles, pouches, boxes, cans).
-      
-      EVALUATION PROTOCOL:
-      Identify every printed text string and logo graphic. Classify them into MASK vs PRESERVE:
+      You are an automated Intellectual Property & Platform Compliance Auditor.
+      RULE: Mask ONLY what triggers Copyright, Trademark, IP, or Health/Medical claim strikes. Everything else must remain 100% visible.
 
-      MUST MASK (Return tight bounding boxes [ymin, xmin, ymax, xmax] as 0-1000 integers):
-      1. INTELLECTUAL PROPERTY: All brand names, manufacturer logos, emblems, and text carrying ™ or ®.
-      2. REGULATED & MEDICAL CLAIMS:
-         - Arched/curved claim text printed above or below logos (e.g., 'KILLS COLD, FLU & COVID-19 VIRUSES'). Box the actual printed text curve.
-         - The word 'SANITIZER' or 'DISINFECTANT' (box only the word, do not touch 'LAUNDRY').
-         - Efficacy claim badges and starbursts ('KILLS 99.9%', 'BACTERIA').
+      STRICT MASK TARGETS (Return tight bounding boxes [ymin, xmin, ymax, xmax] as 0-1000 integers):
+      1. TRADEMARKS & BRAND IP:
+         - Brand names, brand signatures, and manufacturer logos ('Lysol', 'Clorox', 'Arm & Hammer', 'aussie', 'Febreze').
+         - Brand mascots and brand emblems.
+         - Any secondary mark or slogan carrying ™ or ® (e.g., 'fresh burst™', 'ODOR BLASTERS').
+      2. REGULATED MEDICAL / VIRUCIDAL CLAIMS (Platform Policy Triggers):
+         - Words making medical claims: 'SANITIZER' or 'DISINFECTANT' (box only the word itself).
+         - Virus & germ claim lines: 'KILLS 99.9%', 'COVID-19', 'VIRUSES', 'COLD & FLU', 'BACTERIA'.
+         - On multipacks (e.g. 3 spray cans): The red horizontal claim strip ('Eliminates Odors by Killing 99.9%...') must be boxed as a SINGLE wide horizontal banner. Do not run vertical boxes down into the blue packaging.
 
-      STRICT HARDWARE & PRESERVE EXCLUSIONS (NEVER BOX):
-      - DO NOT BOX HARDWARE: The blue bottle cap, closures, neck plastic, handles, and blank container surfaces are physical parts, NOT text. Every box MUST contain printed ink.
-      - PRESERVE: Keep 'LAUNDRY', 'CRISP LINEN SCENT', and '90 FL OZ' completely unboxed.
+      STRICT PRESERVE LIST (NEVER MASK):
+      - Generic product nouns: 'LAUNDRY', 'AIR', 'DETERGENT', 'SHAMPOO', 'CONDITIONER', 'CLEANER'.
+      - Fluid ounces, counts, and sizes: '90 FL OZ', '3-PACK', '10 Fl.Oz Each', '72 PAKS', '16 oz'.
+      - Neutral descriptors: 'Simple Fresh Scent', 'Crisp Linen Scent', '0% Bleach', apparel graphics.
+      - Physical hardware: Never box bottle caps, spray nozzles, or handles.
 
-      Return ONLY valid JSON matching this schema:
+      Return ONLY valid JSON:
       {
         "boxes": [[ymin, xmin, ymax, xmax]],
         "suggested_title": "[Count/Volume] + [Generic Product Category] + [Key Safe Feature] + [Generic Scent/Flavor]"
