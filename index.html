@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Deal Sanitizer & Auto-Masker v1.2.28</title>
+  <title>Deal Sanitizer & Auto-Masker v1.2.29</title>
   <style>
     body { 
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
@@ -177,7 +177,7 @@
 </head>
 <body>
 
-<div class="app-version-fixed">v1.2.28</div>
+<div class="app-version-fixed">v1.2.29</div>
 
 <div class="container">
   <!-- TOP CARD: CONTROLS & API -->
@@ -185,7 +185,7 @@
     <div style="margin-bottom: 1rem;">
       <h2 style="margin: 0; font-size: 1.4rem;">
         Automated Deal Asset Sanitizer 
-        <span class="version-header-badge">v1.2.28</span>
+        <span class="version-header-badge">v1.2.29</span>
       </h2>
     </div>
 
@@ -487,10 +487,13 @@
          - Return small slim strips over 'SCIENTIFICALLY PROVEN' at the top of each can collar.
 
       2. LIQUID JUGS & ASYMMETRICAL BOTTLES (e.g. Lysol):
-         - Target A (Brand Name Only): A tight box around the diagonal cursive brand logo ('Lysol'). Stop ABOVE 'LAUNDRY'.
-         - Target B (Neck Collar Claim): A slim horizontal box across the arched claim line ('KILLS COLD, FLU & COVID-19 VIRUSES') near the dark blue collar.
-         - Target C (Left Flank Red Badge): A dedicated box over the red scalloped burst badge ('KILLS 99.9% OF BACTERIA'). Crucial: Set xmin to 0 so its outer scalloped edge is completely submerged.
-         - Target D (Sanitizer Only): A slim horizontal rectangle strictly over the word 'SANITIZER'. Keep 'LAUNDRY' completely uncovered above it.
+         - UPPER SHIELD MASK (One Unified Box):
+           * Anchor from the dark blue neck collar down to the red curve directly above 'LAUNDRY'.
+           * Set xmin to 0 so the entire left flank red burst badge ('KILLS 99.9%') is submerged together with the diagonal brand name and arched neck claims.
+           * Stop strictly ABOVE 'LAUNDRY' (do not touch 'LAUNDRY').
+         - SANITIZER STRIP:
+           * Return a tight horizontal strip over the word 'SANITIZER'.
+           * Keep 'LAUNDRY' clean above, and 'CRISP LINEN SCENT' clean below.
 
       3. POUCHES & PACKS (e.g. Arm & Hammer):
          - Snug circular box over hammer emblem.
@@ -697,7 +700,8 @@
     const feather = Math.max(1, Math.min(6, Math.round(Math.min(rw, rh) * 0.08)));
     mCtx.fillStyle = "#ffffff";
     if (isBorderSnapped) {
-      mCtx.fillRect(0, 0, rw - feather, rh);
+      // Keep x = 0 flush to eliminate the left border gap, but feather top/bottom smoothly
+      mCtx.fillRect(0, feather, rw - feather, Math.max(1, rh - feather * 2));
     } else {
       mCtx.fillRect(feather, feather, Math.max(1, rw - feather * 2), Math.max(1, rh - feather * 2));
     }
