@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Deal Sanitizer & Auto-Masker v1.2.39</title>
+  <title>Deal Sanitizer & Auto-Masker v1.2.40</title>
   <style>
     body { 
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
@@ -175,14 +175,14 @@
 </head>
 <body>
 
-<div class="app-version-fixed">v1.2.39</div>
+<div class="app-version-fixed">v1.2.40</div>
 
 <div class="container">
   <div class="card">
     <div style="margin-bottom: 1rem;">
       <h2 style="margin: 0; font-size: 1.4rem;">
         Automated Deal Asset Sanitizer 
-        <span class="version-header-badge">v1.2.39</span>
+        <span class="version-header-badge">v1.2.40</span>
       </h2>
     </div>
 
@@ -197,7 +197,7 @@
           <option value="gemini-3.1-flash-lite" selected>gemini-3.1-flash-lite (2nd-to-Latest Lite)</option>
           <option value="gemini-3.5-flash-lite">gemini-3.5-flash-lite</option>
           <option value="gemini-2.5-flash-lite">gemini-2.5-flash-lite</option>
-          <option value="gemini-flash-lite-latest">gemini-flash-lite-latest</option>
+          <option value="gemini-flash-latest">gemini-flash-latest</option>
         </select>
       </div>
       <div>
@@ -214,7 +214,7 @@
       <div>
         <label>Masking Visual Style</label>
         <select id="maskMode">
-          <option value="diffusion" selected>Radial Frosted Diffusion</option>
+          <option value="diffusion" selected>Dynamic Frosted Diffusion</option>
           <option value="ambient">Ambient Gradient Block</option>
           <option value="pixelate">Mosaic Pixelation</option>
           <option value="solid">Clean Dark Tape</option>
@@ -303,7 +303,6 @@
       const data = await res.json();
       if (!data.models || !Array.isArray(data.models)) return;
 
-      // Filter strictly to generation-capable, general multimodal LITE models
       const pureLiteModels = data.models
         .filter(function(m) {
           const methods = m.supportedGenerationMethods || [];
@@ -323,7 +322,6 @@
 
       if (pureLiteModels.length === 0) return;
 
-      // Group by numeric version
       const versionMap = {};
       pureLiteModels.forEach(function(n) {
         const m = n.match(/gemini-(\d+(?:\.\d+)?)/i);
@@ -334,10 +332,7 @@
         }
       });
 
-      // Sort descending (newest version first)
       const sortedVersions = Object.keys(versionMap).map(Number).sort(function(a, b) { return b - a; });
-
-      // Target strictly the 2nd-to-the-latest release (index 1)
       const targetVersion = sortedVersions.length >= 2 ? sortedVersions[1] : sortedVersions[0];
       const chosenGroup = versionMap[targetVersion] || pureLiteModels;
       const autoSelected = chosenGroup[0] || pureLiteModels[0];
@@ -464,6 +459,7 @@
     }
   });
 
+  // Direct, positive target sweep optimized for 3.1-Lite reasoning
   document.getElementById("processBtn").addEventListener("click", async function() {
     const key = keyInput.value.trim();
     const selectedModel = document.getElementById("modelSelect").value;
@@ -473,32 +469,30 @@
 
     const btn = document.getElementById("processBtn");
     btn.disabled = true;
-    btn.innerText = "Auditing packaging boundaries...";
+    btn.innerText = "Auditing packaging targets...";
 
     try {
-      const detectPrompt = "You are an automated Intellectual Property & Regulatory Compliance Auditor conducting an exhaustive visual sweep.\n" +
-      "Return normalized bounding boxes [ymin, xmin, ymax, xmax] (0-1000 integers) for EVERY sensitive text and graphic mark on this packaging.\n\n" +
-      "MANDATORY DETECTION TARGETS (ZERO-TOLERANCE):\n\n" +
-      "1. RESTRICTED MEDICAL, VIRAL & REGULATORY TERMS:\n" +
-      "   - The word 'SANITIZER' or 'DISINFECTANT' wherever it appears. Box it snugly without touching 'LAUNDRY'.\n" +
-      "   - Scientific and testing claims: 'SCIENTIFICALLY PROVEN', 'CLINICALLY TESTED'.\n" +
-      "   - Virus claims: 'COVID-19', 'COLD & FLU', 'VIRUSES', 'KILLS 99.9%'.\n" +
-      "   - Standalone promotional claim badges and starburst seals.\n\n" +
-      "2. TRADEMARKS & BRAND NAMES:\n" +
-      "   - Primary brand logos, emblems, cursive brand wordmarks, and mascot seals.\n" +
-      "   - Secondary sub-brands, co-brands, or marks accompanied by ™ or ® (e.g. 'OxiClean', 'ODOR BLASTERS', 'fresh burst™').\n\n" +
-      "3. SURGICAL LINE-BY-LINE ITEMIZATION RULE:\n" +
-      "   - When words appear in stacked lines (e.g., 'LAUNDRY' stacked over 'SANITIZER', or 'AIR' stacked over 'SANITIZER'):\n" +
-      "     * You MUST box ONLY the word 'SANITIZER'.\n" +
-      "     * NEVER box the words 'LAUNDRY' or 'AIR'. Keep their boxes completely separate.\n" +
-      "   - NEVER output one large aggregate block. Return tight, individual boxes hugging each specific mark.\n\n" +
-      "STRICT WHITELIST (NEVER COVER):\n" +
-      "   - Common product category terms: 'LAUNDRY', 'AIR', 'DETERGENT', 'FABRIC REFRESHER', '5 in 1 POWER PAKS'.\n" +
-      "   - Quantities and counts: '90 FL OZ', '72 PAKS', '3-PACK', '10 Fl.Oz Each', '16 oz'.\n" +
-      "   - Neutral features: '0% BLEACH', 'ELIMINATES ODORS AT THE SOURCE', 'ELIMINATES TOUGH ODORS'.\n" +
-      "   - Packaging structure: handles, caps, nozzles, laundry pod visuals, clothing illustrations.\n\n" +
-      "Return ONLY valid JSON matching this schema:\n" +
-      "{\n  \"boxes\": [[ymin, xmin, ymax, xmax]],\n  \"suggested_title\": \"Generic brand-free compliant title\"\n}";
+      const detectPrompt = `
+      You are an automated Intellectual Property & Regulatory Compliance Auditor.
+      Return normalized bounding boxes [ymin, xmin, ymax, xmax] (0-1000 integers) for EVERY sensitive mark on this packaging:
+
+      MANDATORY DETECTION TARGETS:
+      1. Primary brand logos, emblems, wordmarks, and mascot seals (e.g. 'Lysol', 'Clorox', 'Arm & Hammer', 'aussie'). You MUST detect the central brand logo.
+      2. The word 'SANITIZER' or 'DISINFECTANT' wherever it appears on the label (e.g., box 'SANITIZER' directly below 'LAUNDRY').
+      3. Health, viral, and antimicrobial claim text: 'KILLS 99.9%', 'COVID-19', 'VIRUSES', 'COLD & FLU', 'SCIENTIFICALLY PROVEN', 'BACTERIA'.
+      4. Standalone promotional badges, starburst claim seals, and scent marks with ™ or ® ('fresh burst™', 'ODOR BLASTERS').
+
+      PRESERVE (DO NOT MASK):
+      - Common category words: 'LAUNDRY', 'DETERGENT', 'AIR', 'SHAMPOO', 'CONDITIONER'.
+      - Fluid volume and pack counts: '90 FL OZ', '72 PAKS', '3-PACK', '16 oz'.
+      - Neutral descriptors: '0% BLEACH', 'CRISP LINEN SCENT', clothing illustrations.
+
+      Return ONLY valid JSON matching this schema:
+      {
+        "boxes": [[ymin, xmin, ymax, xmax]],
+        "suggested_title": "Generic brand-free compliant title"
+      }
+      `;
 
       const detectData = await callGeminiWithFallback(key, {
         contents: [{
@@ -543,9 +537,9 @@
     const w = xmax - xmin;
     const h = ymax - ymin;
 
-    const ratio = userRatio === "auto" ? 0.04 : parseFloat(userRatio);
+    const ratio = userRatio === "auto" ? 0.05 : parseFloat(userRatio);
     const padX = Math.max(3, Math.round(w * ratio));
-    const padY = Math.max(2, Math.round(h * (ratio * 0.75)));
+    const padY = Math.max(2, Math.round(h * (ratio * 0.8)));
 
     let newYmin = Math.max(0, ymin - padY);
     let newXmin = Math.max(0, xmin - padX);
@@ -613,14 +607,13 @@
     document.getElementById("downloadBtn").style.display = "inline-block";
   }
 
+  // Pure Organic Frosted Diffusion: No fake white solid blocks
   function applyFrostedDiffusion(x, y, w, h, isBorderSnapped) {
     if (w <= 0 || h <= 0) return;
     const rw = Math.max(1, Math.round(w));
     const rh = Math.max(1, Math.round(h));
 
-    const dynamicBlur = Math.max(18, Math.round(24 * (outputCanvas.width / 1400)));
-    const pad = Math.round(dynamicBlur * 1.1);
-
+    const pad = Math.round(Math.min(rw, rh) * 0.35 + 16);
     const srcX = Math.max(0, x - pad);
     const srcY = Math.max(0, y - pad);
     const srcW = Math.min(loadedImage.naturalWidth - srcX, rw + pad * 2);
@@ -631,37 +624,8 @@
     off.height = srcH;
     const offCtx = off.getContext("2d");
 
-    // Sample local packaging points
-    const samplePoints = [
-      { sx: x + Math.round(rw * 0.1), sy: y + Math.round(rh * 0.1) },
-      { sx: x + Math.round(rw * 0.9), sy: y + Math.round(rh * 0.1) },
-      { sx: x + Math.round(rw * 0.5), sy: Math.max(0, y - 3) },
-      { sx: x + Math.round(rw * 0.5), sy: Math.min(loadedImage.naturalHeight - 1, y + rh + 3) }
-    ];
-
-    const validColors = [];
-    const pCanvas = document.createElement("canvas");
-    pCanvas.width = 1; 
-    pCanvas.height = 1;
-    const pCtx = pCanvas.getContext("2d");
-
-    samplePoints.forEach(function(pt) {
-      pCtx.drawImage(loadedImage, pt.sx, pt.sy, 1, 1, 0, 0, 1, 1);
-      const pixel = pCtx.getImageData(0, 0, 1, 1).data;
-      const pr = pixel[0], pg = pixel[1], pb = pixel[2];
-      const lum = 0.299 * pr + 0.587 * pg + 0.114 * pb;
-      if (lum < 248) {
-        validColors.push({ r: pr, g: pg, b: pb });
-      }
-    });
-
-    let r = 180, g = 180, b = 180;
-    if (validColors.length > 0) {
-      const median = validColors[Math.floor(validColors.length / 2)];
-      r = median.r; g = median.g; b = median.b;
-    }
-
-    const scale = 0.02;
+    // 1. Downsample to 6% to destroy font glyphs and text strokes
+    const scale = 0.06;
     const mini = document.createElement("canvas");
     mini.width = Math.max(2, Math.floor(srcW * scale));
     mini.height = Math.max(2, Math.floor(srcH * scale));
@@ -672,17 +636,13 @@
     offCtx.drawImage(mini, 0, 0, mini.width, mini.height, 0, 0, srcW, srcH);
     offCtx.imageSmoothingEnabled = true;
 
-    const isCompact = Math.min(rw, rh) < 40;
-    offCtx.fillStyle = isCompact 
-      ? "rgba(" + r + ", " + g + ", " + b + ", 1.0)" 
-      : "rgba(" + r + ", " + g + ", " + b + ", 0.92)";
-    offCtx.fillRect(0, 0, srcW, srcH);
-
+    // 2. Diffuse with Gaussian blur on the actual packaging colors
+    const blurRadius = Math.max(20, Math.round(24 * (outputCanvas.width / 1400)));
     const blurCanvas = document.createElement("canvas");
     blurCanvas.width = srcW;
     blurCanvas.height = srcH;
     const bCtx = blurCanvas.getContext("2d");
-    bCtx.filter = "blur(" + dynamicBlur + "px)";
+    bCtx.filter = "blur(" + blurRadius + "px)";
     bCtx.drawImage(off, 0, 0);
 
     const offsetX = x - srcX;
@@ -694,28 +654,30 @@
     const pCtx2 = patchCanvas.getContext("2d");
     pCtx2.drawImage(blurCanvas, offsetX, offsetY, rw, rh, 0, 0, rw, rh);
 
+    // 3. Alpha-feather mask (Soft organic border)
     const maskCanvas = document.createElement("canvas");
     maskCanvas.width = rw;
     maskCanvas.height = rh;
     const mCtx = maskCanvas.getContext("2d");
 
-    const feather = isCompact ? 0 : Math.max(1, Math.min(5, Math.round(Math.min(rw, rh) * 0.06)));
-
+    const feather = Math.max(2, Math.min(8, Math.round(Math.min(rw, rh) * 0.1)));
     mCtx.fillStyle = "#ffffff";
-    if (feather === 0) {
-      mCtx.fillRect(0, 0, rw, rh);
-    } else if (isBorderSnapped) {
+
+    if (isBorderSnapped) {
       mCtx.fillRect(0, 0, rw - feather, rh);
-      mCtx.filter = "blur(" + feather + "px)";
-      mCtx.drawImage(maskCanvas, 0, 0);
     } else {
       mCtx.fillRect(feather, feather, Math.max(1, rw - feather * 2), Math.max(1, rh - feather * 2));
-      mCtx.filter = "blur(" + feather + "px)";
-      mCtx.drawImage(maskCanvas, 0, 0);
     }
 
+    const softMask = document.createElement("canvas");
+    softMask.width = rw;
+    softMask.height = rh;
+    const sCtx = softMask.getContext("2d");
+    sCtx.filter = "blur(" + feather + "px)";
+    sCtx.drawImage(maskCanvas, 0, 0);
+
     pCtx2.globalCompositeOperation = "destination-in";
-    pCtx2.drawImage(maskCanvas, 0, 0);
+    pCtx2.drawImage(softMask, 0, 0);
 
     ctx.save();
     ctx.drawImage(patchCanvas, x, y);
