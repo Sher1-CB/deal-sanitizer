@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Deal Sanitizer & Auto-Masker v1.2.35</title>
+  <title>Deal Sanitizer & Auto-Masker v1.2.36</title>
   <style>
     body { 
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
@@ -175,14 +175,14 @@
 </head>
 <body>
 
-<div class="app-version-fixed">v1.2.35</div>
+<div class="app-version-fixed">v1.2.36</div>
 
 <div class="container">
   <div class="card">
     <div style="margin-bottom: 1rem;">
       <h2 style="margin: 0; font-size: 1.4rem;">
         Automated Deal Asset Sanitizer 
-        <span class="version-header-badge">v1.2.35</span>
+        <span class="version-header-badge">v1.2.36</span>
       </h2>
     </div>
 
@@ -474,9 +474,10 @@
       "Return normalized bounding boxes [ymin, xmin, ymax, xmax] (0-1000 integers) for EVERY sensitive text and graphic mark on this packaging.\n\n" +
       "MANDATORY DETECTION TARGETS (ZERO-TOLERANCE):\n\n" +
       "1. RESTRICTED MEDICAL, VIRAL & REGULATORY TERMS:\n" +
-      "   - The word 'SANITIZER' or 'DISINFECTANT' wherever it appears.\n" +
-      "   - Scientific and testing claims: 'SCIENTIFICALLY PROVEN', 'CLINICALLY TESTED', 'LAB TESTED'.\n" +
-      "   - Efficacy and virus claims: 'KILLS 99.9%', 'COVID-19', 'COLD & FLU', 'VIRUSES', 'BACTERIA'.\n" +
+      "   - The word 'SANITIZER' or 'DISINFECTANT' wherever it appears. Box it snugly without touching 'LAUNDRY'.\n" +
+      "   - Scientific and testing claims: 'SCIENTIFICALLY PROVEN', 'CLINICALLY TESTED'.\n" +
+      "   - Virus claims: 'COVID-19', 'COLD & FLU', 'VIRUSES', 'KILLS 99.9%'.\n" +
+      "   - For arched collar claims above brand logos, ensure the top edge (ymin) starts right at the blue neck collar so the words 'COVID-19' and 'VIRUSES' are fully enclosed.\n" +
       "   - Standalone promotional claim badges and starburst seals.\n\n" +
       "2. TRADEMARKS & BRAND NAMES:\n" +
       "   - Primary brand logos, emblems, cursive brand wordmarks, and mascot seals.\n" +
@@ -537,20 +538,22 @@
     var w = xmax - xmin;
     var h = ymax - ymin;
 
-    var padX = Math.max(4, Math.round(w * 0.05));
-    var padY = Math.max(3, Math.round(h * 0.05));
+    // Snug padding that preserves neighboring lines
+    var padX = Math.max(3, Math.round(w * 0.04));
+    var padY = Math.max(2, Math.round(h * 0.03));
 
     var newYmin = Math.max(0, ymin - padY);
     var newXmin = Math.max(0, xmin - padX);
     var newYmax = Math.min(1000, ymax + padY);
     var newXmax = Math.min(1000, xmax + padX);
 
-    if (xmin <= 150) newXmin = 0;
-    if (xmax >= 880) newXmax = 1000;
+    // Only snap to the absolute image border if the box already touches the outer edge (<= 3%)
+    if (xmin <= 30) newXmin = 0;
+    if (xmax >= 970) newXmax = 1000;
 
     return [newYmin, newXmin, newYmax, newXmax];
   }
-
+  
   function renderLeftTargetView() {
     if (!loadedImage) return;
     tCtx.clearRect(0, 0, targetCanvas.width, targetCanvas.height);
@@ -665,7 +668,11 @@
     offCtx.drawImage(mini, 0, 0, mini.width, mini.height, 0, 0, srcW, srcH);
     offCtx.imageSmoothingEnabled = true;
 
-    offCtx.fillStyle = "rgba(" + r + ", " + g + ", " + b + ", 0.88)";
+    // Small text lines (like SANITIZER) need full opacity so black ink never bleeds through
+    var isThinStrip = Math.min(rw, rh) < 45;
+    offCtx.fillStyle = isThinStrip 
+      ? "rgba(" + r + ", " + g + ", " + b + ", 1.0)" 
+      : "rgba(" + r + ", " + g + ", " + b + ", 0.92)";
     offCtx.fillRect(0, 0, srcW, srcH);
 
     var blurCanvas = document.createElement("canvas");
