@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Deal Sanitizer & Auto-Masker v1.2.41</title>
+  <title>Deal Sanitizer & Auto-Masker v1.2.42</title>
   <style>
     body { 
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
@@ -175,14 +175,14 @@
 </head>
 <body>
 
-<div class="app-version-fixed">v1.2.41</div>
+<div class="app-version-fixed">v1.2.42</div>
 
 <div class="container">
   <div class="card">
     <div style="margin-bottom: 1rem;">
       <h2 style="margin: 0; font-size: 1.4rem;">
         Automated Deal Asset Sanitizer 
-        <span class="version-header-badge">v1.2.41</span>
+        <span class="version-header-badge">v1.2.42</span>
       </h2>
     </div>
 
@@ -560,9 +560,9 @@
     if (rawAiBoxes.length === 0) return;
 
     tCtx.save();
-    tCtx.strokeStyle = "#ef4444";
-    tCtx.lineWidth = 3.5;
-    tCtx.setLineDash([6, 5]);
+    tCtx.strokeStyle = "#dc2626";
+    tCtx.lineWidth = 5.5; // Thicker, high-visibility audit stroke
+    tCtx.setLineDash([8, 6]);
 
     rawAiBoxes.forEach(function(box) {
       const ymin = box[0], xmin = box[1], ymax = box[2], xmax = box[3];
@@ -624,9 +624,9 @@
     off.height = srcH;
     const offCtx = off.getContext("2d");
 
-    // 1. Downsample to destroy font glyphs
+    // 1. Aggressive downsample to crush letterform contrast
     const isThinLine = rh < 45;
-    const scale = isThinLine ? 0.03 : 0.06;
+    const scale = isThinLine ? 0.025 : 0.04;
     const mini = document.createElement("canvas");
     mini.width = Math.max(2, Math.floor(srcW * scale));
     mini.height = Math.max(2, Math.floor(srcH * scale));
