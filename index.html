@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Deal Sanitizer & Auto-Masker v1.2.42</title>
+  <title>Deal Sanitizer & Auto-Masker v1.2.43</title>
   <style>
     body { 
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
@@ -175,14 +175,14 @@
 </head>
 <body>
 
-<div class="app-version-fixed">v1.2.42</div>
+<div class="app-version-fixed">v1.2.43</div>
 
 <div class="container">
   <div class="card">
     <div style="margin-bottom: 1rem;">
       <h2 style="margin: 0; font-size: 1.4rem;">
         Automated Deal Asset Sanitizer 
-        <span class="version-header-badge">v1.2.42</span>
+        <span class="version-header-badge">v1.2.43</span>
       </h2>
     </div>
 
@@ -477,15 +477,15 @@
       Return normalized bounding boxes [ymin, xmin, ymax, xmax] (0-1000 integers) for EVERY sensitive mark on this packaging:
 
       MANDATORY DETECTION TARGETS:
-      1. Primary brand logos, emblems, wordmarks, and mascot seals (e.g. 'Lysol', 'Clorox', 'Arm & Hammer', 'aussie'). You MUST detect the central brand logo.
-      2. The word 'SANITIZER' or 'DISINFECTANT' wherever it appears on the label (e.g., box 'SANITIZER' directly below 'LAUNDRY').
-      3. Health, viral, and antimicrobial claim text: 'KILLS 99.9%', 'COVID-19', 'VIRUSES', 'COLD & FLU', 'SCIENTIFICALLY PROVEN', 'BACTERIA'.
-      4. Standalone promotional badges, starburst claim seals, and scent marks with ™ or ® ('fresh burst™', 'ODOR BLASTERS').
+      1. UPPER ARCH ANCHOR: For curved claim text ('KILLS COLD, FLU & COVID-19 VIRUSES'), the bounding box MUST anchor its top edge (ymin) directly against the blue plastic neck collar so no red letters escape at the top.
+      2. CENTRAL LOGO: Generously box the primary brand emblem ('Lysol', 'Clorox', 'Arm & Hammer') to eliminate white letterform ghosting.
+      3. SURGICAL SANITIZER LINE: Box ONLY the isolated word 'SANITIZER'. Do NOT include 'LAUNDRY' above it, and do NOT include 'CRISP LINEN SCENT' below it.
+      4. Health badges and starbursts: 'KILLS 99.9%', 'BACTERIA', 'VIRUSES', 'ODOR BLASTERS'.
 
-      PRESERVE (DO NOT MASK):
-      - Common category words: 'LAUNDRY', 'DETERGENT', 'AIR', 'SHAMPOO', 'CONDITIONER'.
-      - Fluid volume and pack counts: '90 FL OZ', '72 PAKS', '3-PACK', '16 oz'.
-      - Neutral descriptors: '0% BLEACH', 'CRISP LINEN SCENT', clothing illustrations.
+      STRICT PRESERVE LIST (NEVER BOX):
+      - 'LAUNDRY' (must stay crisp and unmasked).
+      - 'CRISP LINEN SCENT' (must stay crisp and unmasked).
+      - '90 FL OZ', '0% BLEACH', and clothing graphics.
 
       Return ONLY valid JSON matching this schema:
       {
@@ -644,7 +644,7 @@
       const pCtx = pCanvas.getContext("2d");
       pCtx.drawImage(loadedImage, x + rw * 0.5, Math.max(0, y - 4), 1, 1, 0, 0, 1, 1);
       const [r, g, b] = pCtx.getImageData(0, 0, 1, 1).data;
-      offCtx.fillStyle = `rgba(${r}, ${g}, ${b}, 0.75)`;
+      offCtx.fillStyle = `rgba(${r}, ${g}, ${b}, 0.88)`;
       offCtx.fillRect(0, 0, srcW, srcH);
     }
 
