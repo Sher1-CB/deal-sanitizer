@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Deal Sanitizer & Auto-Masker v1.2.56</title>
+  <title>Deal Sanitizer & Auto-Masker v1.2.57</title>
   <style>
     body { 
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
@@ -175,14 +175,14 @@
 </head>
 <body>
 
-<div class="app-version-fixed">v1.2.56</div>
+<div class="app-version-fixed">v1.2.57</div>
 
 <div class="container">
   <div class="card">
     <div style="margin-bottom: 1rem;">
       <h2 style="margin: 0; font-size: 1.4rem;">
         Automated Deal Asset Sanitizer 
-        <span class="version-header-badge">v1.2.56</span>
+        <span class="version-header-badge">v1.2.57</span>
       </h2>
     </div>
 
@@ -333,7 +333,8 @@
       });
 
       const sortedVersions = Object.keys(versionMap).map(Number).sort(function(a, b) { return b - a; });
-      const targetVersion = sortedVersions.length >= 2 ? sortedVersions[1] : sortedVersions[0];
+      // Target the latest release in Lite tier (index 0 for maximum vision precision)
+      const targetVersion = sortedVersions[0];
       const chosenGroup = versionMap[targetVersion] || pureLiteModels;
       const autoSelected = chosenGroup[0] || pureLiteModels[0];
 
@@ -477,41 +478,36 @@
     try {
       const detectPrompt = `
       You are an advanced Intellectual Property, Trademark & Regulatory Compliance Engine.
-      Execute an exhaustive audit using this two-step cognitive protocol to achieve 100% legal compliance with zero commercial over-masking:
+      Execute an exhaustive audit across retail packaging and hardware devices using this two-step protocol:
 
       STEP 1: INVENTORY & CLASSIFICATION
       Classify all visible text and graphics into two strict categories:
 
       - [MUST MASK - LEGAL, TRADEMARK & REGULATORY TRIGGERS]:
         1. PRIMARY & SECONDARY TRADEMARKS:
-           * Primary brand logos, emblems, cursive scripts, and character crests (e.g., 'Lysol', 'Clorox', 'Arm & Hammer', 'aussie', 'Febreze').
-           * Co-branding badges, sub-brands, and ingredient trademarks (e.g., 'plus OxiClean', 'ODOR BLASTERS').
-           * Any scent, tech, or formulation name bearing ™ or ® (e.g., 'fresh burst™', 'Power Paks™').
-        2. REGULATORY, MEDICAL, VIRAL & PESTICIDAL TERMS:
-           * ANY occurrence of the word 'SANITIZER' or 'DISINFECTANT', regardless of font or placement.
-           * Virus, germ, and illness claims: 'COVID-19', 'COLD & FLU', 'VIRUSES', 'BACTERIA', 'KILLS 99.9%'.
-           * Curved claim text lines along bottle collars or necks ('KILLS COLD, FLU & COVID-19 VIRUSES').
-           * Scalloped badges, starburst seals, and flank crests touting kill rates or efficacy.
-        3. SCIENTIFIC STUDY & EPA DISCLAIMERS:
-           * 'SCIENTIFICALLY PROVEN', 'CLINICALLY TESTED', 'DERMATOLOGIST APPROVED', 'LAB TESTED'.
-           * The entire horizontal claim ribbon/banner across multi-packs ('Eliminates Odors by Killing 99.9%...').
+           * Brand names, logos, emblems, and associated symbols ('Amazon' smile arrow, 'Fire TV', 'Lysol', 'Clorox', 'Apple').
+           * Brand marks embossed or printed directly on hardware (streaming sticks, remotes, gadgets).
+           * Pre-branded streaming/shortcut app buttons on remote controls ('Prime Video', 'Netflix', 'Disney+', 'Hulu'). Box these on EVERY remote shown.
+           * Slogans, sub-brands, or tech names bearing ™ or ® ('fresh burst™', 'ODOR BLASTERS', 'Fire TV Stick™').
+        2. REGULATORY & MEDICAL CLAIMS:
+           * 'SANITIZER', 'DISINFECTANT', 'KILLS 99.9%', 'COVID-19', 'VIRUSES', 'BACTERIA', 'SCIENTIFICALLY PROVEN'.
+           * Multipack claim banners (span horizontally across all cans in one box).
 
       - [NEVER MASK - COMMERCIAL DATA & FUNCTIONAL ART]:
-        * Generic category nouns ('LAUNDRY', 'AIR', 'DETERGENT', 'SHAMPOO', 'CONDITIONER', 'FABRIC REFRESHER', 'CLEANER').
-        * Quantities, volumes, and counts ('90 FL OZ', '3-PACK', '10 Fl.Oz Each', '72 PAKS', '16 oz', '5 in 1').
-        * Neutral descriptors and safe features ('Simple Fresh Scent', 'Crisp Linen Scent', '0% Bleach', 'Eliminates Odors at the Source').
-        * Hardware & packaging: Bottle caps, spray triggers, handles, side contours, clothes illustrations, and pods.
+        * Generic category nouns ('Streaming Media Player', 'TV Stick', 'Laundry', 'Detergent', 'Shampoo').
+        * Hardware technical specs: '8 GB', 'Wi-Fi 5', '4K', '90 FL OZ', '72 PAKS', '24 PODS'.
+        * Remote control navigation buttons: Directional rings, power, volume, home, back, and microphone icons.
 
       STEP 2: COORDINATE EXTRACTION (0-1000 INTEGERS [ymin, xmin, ymax, xmax])
-      - MULTI-PACK CANS: Detect targets across EVERY can from left to right (masking brand + 'SANITIZER' + 'SCIENTIFICALLY PROVEN' on each can). Span the red claim banner across all cans in one horizontal strip.
-      - STACKED TEXT: When words are stacked (e.g. 'LAUNDRY' above 'SANITIZER'), box ONLY 'SANITIZER'. Keep 'LAUNDRY' completely untouched.
-      - FLANK BADGES: For scalloped seals on container edges, ensure the box covers the full graphic burst, not just the letters.
-      - NEVER merge distinct, separated text blocks into one huge block.
+      - LOGOS WITH SYMBOLS: For logos with graphic arrows or icons (e.g. 'Amazon' + smile arrow), box the text AND the underlying symbol together in one unified box.
+      - REMOTE APP BUTTONS: Box shortcut app logos tightly on each remote control (left, center, and right).
+      - PACKAGING HEADERS: Box the main product title ('Fire TV Stick 4K Select') as one clean cohesive block.
+      - HARDWARE BODIES: Keep device silhouettes sharp; never bleed boxes into empty floor space.
 
       Return ONLY valid JSON:
       {
         "boxes": [[ymin, xmin, ymax, xmax]],
-        "suggested_title": "[Count/Volume] + [Generic Product Category] + [Key Safe Feature] + [Generic Scent/Flavor]"
+        "suggested_title": "[Key Spec] + [Generic Device/Category] + [Memory/Connectivity]"
       }
       `;
 
