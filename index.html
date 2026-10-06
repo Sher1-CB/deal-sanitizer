@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Deal Sanitizer & Auto-Masker v1.2.55</title>
+  <title>Deal Sanitizer & Auto-Masker v1.2.56</title>
   <style>
     body { 
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
@@ -175,14 +175,14 @@
 </head>
 <body>
 
-<div class="app-version-fixed">v1.2.55</div>
+<div class="app-version-fixed">v1.2.56</div>
 
 <div class="container">
   <div class="card">
     <div style="margin-bottom: 1rem;">
       <h2 style="margin: 0; font-size: 1.4rem;">
         Automated Deal Asset Sanitizer 
-        <span class="version-header-badge">v1.2.55</span>
+        <span class="version-header-badge">v1.2.56</span>
       </h2>
     </div>
 
@@ -382,6 +382,9 @@
       [/\bdisinfecting\b/gi, "Deep Cleaning"],
       [/\bantibacterial\b/gi, "Odor-Fighting"],
       [/\bkills\s+99\.9%(?:\s+of\s+germs|\s+of\s+bacteria)?\b/gi, "Total Clean"],
+      [/\bscientifically\s+proven\b/gi, ""],
+      [/\bclinically\s+tested\b/gi, ""],
+      [/\bodor\s+blasters\b/gi, "Odor Control"],
       [/\bclorox\b/gi, ""],
       [/\blysol\b/gi, ""],
       [/\barm\s*&\s*hammer\b/gi, ""],
@@ -473,35 +476,44 @@
 
     try {
       const detectPrompt = `
-    You are an advanced Intellectual Property & Regulatory Compliance Engine.
-    Execute an audit using this two-step cognitive protocol to achieve 100% legal compliance with zero commercial over-masking:
+      You are an advanced Intellectual Property, Trademark & Regulatory Compliance Engine.
+      Execute an exhaustive audit using this two-step cognitive protocol to achieve 100% legal compliance with zero commercial over-masking:
 
-    STEP 1: INVENTORY & CLASSIFICATION
-    Classify all visible text and graphics into two strict categories:
-    - [MUST MASK - LEGAL & IP TRIGGERS]:
-      * Brand names, logos, mascots, and signatures ('Lysol', 'Clorox', 'Arm & Hammer', 'aussie', 'Febreze').
-      * Secondary marks or slogans with ™ or ® ('fresh burst™', 'ODOR BLASTERS').
-      * Regulated medical/pesticidal terms: 'SANITIZER', 'DISINFECTANT', 'KILLS 99.9%', 'COVID-19', 'VIRUSES', 'COLD & FLU', 'BACTERIA'.
-      * Curved claim text lines above brand logos ('KILLS COLD, FLU & COVID-19 VIRUSES').
-      * THE RED MULTIPACK BANNER: On multi-can packs, you MUST box the entire red horizontal strip ('Eliminates Odors by Killing 99.9% of Odor-Causing Bacteria and Viruses in the air') from edge to edge.
-    - [NEVER MASK - COMMERCIAL DATA]:
-      * Generic category nouns ('LAUNDRY', 'AIR', 'DETERGENT', 'SHAMPOO', 'CONDITIONER', 'CLEANER').
-      * Volume, weights, and counts ('90 FL OZ', '3-PACK', '10 Fl.Oz Each', '72 PAKS', '16 oz').
-      * Neutral descriptors ('Simple Fresh Scent', 'Crisp Linen Scent', '0% Bleach').
-      * Hardware: Bottle caps, spray nozzles, handles, side contours, and blank plastic surfaces.
+      STEP 1: INVENTORY & CLASSIFICATION
+      Classify all visible text and graphics into two strict categories:
 
-    STEP 2: COORDINATE EXTRACTION
-    Return tight, normalized bounding boxes [ymin, xmin, ymax, xmax] (0-1000 integers) STRICTLY for the [MUST MASK] items.
-    - Box 'SANITIZER' tightly without touching 'LAUNDRY' or 'AIR'.
-    - Span the red claim banner from the far left can to the far right can in ONE wide horizontal box.
-    - NEVER place a box on the jug handle or blank plastic container surfaces.
+      - [MUST MASK - LEGAL, TRADEMARK & REGULATORY TRIGGERS]:
+        1. PRIMARY & SECONDARY TRADEMARKS:
+           * Primary brand logos, emblems, cursive scripts, and character crests (e.g., 'Lysol', 'Clorox', 'Arm & Hammer', 'aussie', 'Febreze').
+           * Co-branding badges, sub-brands, and ingredient trademarks (e.g., 'plus OxiClean', 'ODOR BLASTERS').
+           * Any scent, tech, or formulation name bearing ™ or ® (e.g., 'fresh burst™', 'Power Paks™').
+        2. REGULATORY, MEDICAL, VIRAL & PESTICIDAL TERMS:
+           * ANY occurrence of the word 'SANITIZER' or 'DISINFECTANT', regardless of font or placement.
+           * Virus, germ, and illness claims: 'COVID-19', 'COLD & FLU', 'VIRUSES', 'BACTERIA', 'KILLS 99.9%'.
+           * Curved claim text lines along bottle collars or necks ('KILLS COLD, FLU & COVID-19 VIRUSES').
+           * Scalloped badges, starburst seals, and flank crests touting kill rates or efficacy.
+        3. SCIENTIFIC STUDY & EPA DISCLAIMERS:
+           * 'SCIENTIFICALLY PROVEN', 'CLINICALLY TESTED', 'DERMATOLOGIST APPROVED', 'LAB TESTED'.
+           * The entire horizontal claim ribbon/banner across multi-packs ('Eliminates Odors by Killing 99.9%...').
 
-    Return ONLY valid JSON:
-    {
-      "boxes": [[ymin, xmin, ymax, xmax]],
-      "suggested_title": "[Count/Volume] + [Generic Product Category] + [Key Safe Feature] + [Generic Scent/Flavor]"
-    }
-    `;
+      - [NEVER MASK - COMMERCIAL DATA & FUNCTIONAL ART]:
+        * Generic category nouns ('LAUNDRY', 'AIR', 'DETERGENT', 'SHAMPOO', 'CONDITIONER', 'FABRIC REFRESHER', 'CLEANER').
+        * Quantities, volumes, and counts ('90 FL OZ', '3-PACK', '10 Fl.Oz Each', '72 PAKS', '16 oz', '5 in 1').
+        * Neutral descriptors and safe features ('Simple Fresh Scent', 'Crisp Linen Scent', '0% Bleach', 'Eliminates Odors at the Source').
+        * Hardware & packaging: Bottle caps, spray triggers, handles, side contours, clothes illustrations, and pods.
+
+      STEP 2: COORDINATE EXTRACTION (0-1000 INTEGERS [ymin, xmin, ymax, xmax])
+      - MULTI-PACK CANS: Detect targets across EVERY can from left to right (masking brand + 'SANITIZER' + 'SCIENTIFICALLY PROVEN' on each can). Span the red claim banner across all cans in one horizontal strip.
+      - STACKED TEXT: When words are stacked (e.g. 'LAUNDRY' above 'SANITIZER'), box ONLY 'SANITIZER'. Keep 'LAUNDRY' completely untouched.
+      - FLANK BADGES: For scalloped seals on container edges, ensure the box covers the full graphic burst, not just the letters.
+      - NEVER merge distinct, separated text blocks into one huge block.
+
+      Return ONLY valid JSON:
+      {
+        "boxes": [[ymin, xmin, ymax, xmax]],
+        "suggested_title": "[Count/Volume] + [Generic Product Category] + [Key Safe Feature] + [Generic Scent/Flavor]"
+      }
+      `;
 
       const detectData = await callGeminiWithFallback(key, {
         contents: [{
